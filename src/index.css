@@ -1,1 +1,10 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Prompt", sans-serif;
+}
+
+/* เพิ่มให้ตัวหนังสือทั้งหน้าเว็บใช้ฟอนต์ Prompt เป็นค่าเริ่มต้น */
+body {
+  font-family: var(--font-sans);
+}
