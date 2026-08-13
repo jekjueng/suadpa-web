@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   signInAnon,
   subscribeToAuthState,
@@ -24,6 +24,12 @@ export function useAuth() {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
 
+  // When the user explicitly signs out, the next anonymous session is "fresh"
+  // (no playlist data worth preserving). Skip linkWithPopup to avoid the
+  // double-popup / popup-blocked issue caused by Firebase's internal token
+  // state not being ready on a freshly created anonymous user.
+  const skipLinkingRef = useRef(false);
+
   useEffect(() => {
     const unsubscribe = subscribeToAuthState(async (firebaseUser) => {
       if (firebaseUser) {
@@ -45,8 +51,10 @@ export function useAuth() {
   const handleGoogleSignIn = useCallback(async () => {
     setIsAuthLoading(true);
     setAuthError(null);
+    const skipLinking = skipLinkingRef.current;
+    skipLinkingRef.current = false; // consume the flag
     try {
-      const { user: signedInUser } = await signInWithGoogle();
+      const { user: signedInUser } = await signInWithGoogle(skipLinking);
       setUser(toPlainUser(signedInUser));
     } catch (err) {
       if (err.code !== "auth/popup-closed-by-user" && err.code !== "auth/cancelled-popup-request") {
@@ -60,6 +68,7 @@ export function useAuth() {
   const handleSignOut = useCallback(async () => {
     setIsAuthLoading(true);
     setAuthError(null);
+    skipLinkingRef.current = true; // next anonymous session is fresh → skip linking
     try {
       await signOutUser();
       // onAuthStateChanged will fire and trigger signInAnon automatically

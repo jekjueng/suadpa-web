@@ -21,52 +21,43 @@ export function subscribeToAuthState(callback) {
 }
 
 /**
- * Links an anonymous account to Google, or falls back to a regular Google
- * sign-in when the credential is already tied to an existing account.
+ * Signs in with Google.
+ *
+ * @param {boolean} skipLinking - When true, always use signInWithPopup directly
+ *   (no linkWithPopup attempt). Pass true when the caller knows the current
+ *   anonymous session was just created after a logout and has no data worth
+ *   preserving — this avoids the double-popup / popup-blocked problem that
+ *   occurs when linkWithPopup fails internally and we try to open a second
+ *   popup in the catch block.
  *
  * Returns { user, wasLinked }
  *   wasLinked = true  → same UID kept, Firestore data preserved
- *   wasLinked = false → new UID (Google account), Firestore data may differ
- *
- * Fallback strategy for linkWithPopup failures:
- *   - auth/credential-already-in-use  → signInWithCredential (existing account)
- *   - auth/popup-closed-by-user       → re-throw (user cancelled, show nothing)
- *   - auth/cancelled-popup-request    → re-throw (user cancelled)
- *   - Any other error (incl. internal Firebase errors like _getIdTokenResponse
- *     on undefined that occur when the anonymous user's token state has not
- *     fully initialised after a recent logout/re-login cycle) → fall back to
- *     plain signInWithPopup so the user can always sign in successfully.
+ *   wasLinked = false → new UID (Google account)
  */
-export async function signInWithGoogle() {
+export async function signInWithGoogle(skipLinking = false) {
   const currentUser = auth.currentUser;
 
-  if (currentUser?.isAnonymous) {
+  if (!skipLinking && currentUser?.isAnonymous) {
     try {
       const result = await linkWithPopup(currentUser, googleProvider);
       return { user: result.user, wasLinked: true };
     } catch (err) {
-      // User dismissed the popup — propagate so the UI stays silent
       if (
         err.code === "auth/popup-closed-by-user" ||
         err.code === "auth/cancelled-popup-request"
       ) {
         throw err;
       }
-
-      // Google credential already belongs to an existing account
       if (err.code === "auth/credential-already-in-use" && err.credential) {
         const result = await signInWithCredential(auth, err.credential);
         return { user: result.user, wasLinked: false };
       }
-
-      // Any other error (internal Firebase state inconsistency after
-      // logout + immediate re-login, network blip, etc.) — fall back to
-      // a fresh signInWithPopup which always works regardless of auth state.
-      const result = await signInWithPopup(auth, googleProvider);
-      return { user: result.user, wasLinked: false };
+      throw err;
     }
   }
 
+  // Direct sign-in (no linking): used when skipLinking=true (post-logout fresh
+  // anonymous session) or when the current user is not anonymous.
   const result = await signInWithPopup(auth, googleProvider);
   return { user: result.user, wasLinked: false };
 }
