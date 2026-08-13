@@ -91,13 +91,10 @@ function ToggleSwitch({ enabled, onChange, label, description }) {
 
 // ── Voice & Speed settings ───────────────────────────────────────────────────
 
+// Verified against Google Cloud TTS voices list (th-TH, Aug 2026).
 const TTS_VOICES = [
-  { value: "th-TH-Neural2-C", label: "Neural หญิง (แนะนำ)", badge: "Neural" },
-  { value: "th-TH-Neural2-B", label: "Neural ชาย",           badge: "Neural" },
-  { value: "th-TH-Wavenet-A", label: "WaveNet หญิง",         badge: "WaveNet" },
-  { value: "th-TH-Wavenet-B", label: "WaveNet ชาย",          badge: "WaveNet" },
-  { value: "th-TH-Standard-A", label: "Standard หญิง",       badge: "Standard" },
-  { value: "th-TH-Standard-B", label: "Standard ชาย",        badge: "Standard" },
+  { value: "th-TH-Neural2-C",  label: "Neural2 หญิง (แนะนำ)", badge: "Neural2"  },
+  { value: "th-TH-Standard-A", label: "Standard หญิง",        badge: "Standard" },
 ];
 
 const SPEED_OPTIONS = [
@@ -118,7 +115,7 @@ function SettingsSection({ settings, onUpdateSetting }) {
 
   // Keep local draft in sync when Firestore settings arrive (e.g. on first
   // load or from another device), but DO NOT override while preview is active.
-  const [previewStatus, setPreviewStatus] = useState("idle"); // "idle" | "loading" | "playing"
+  const [previewStatus, setPreviewStatus] = useState("idle"); // "idle" | "loading" | "playing" | "error"
   const audioRef = useRef(null);
 
   useEffect(() => {
@@ -167,18 +164,21 @@ function SettingsSection({ settings, onUpdateSetting }) {
         audioRef.current = null;
       };
       audio.onerror = () => {
-        setPreviewStatus("idle");
+        setPreviewStatus("error");
         audioRef.current = null;
       };
       await audio.play();
       setPreviewStatus("playing");
     } catch {
-      setPreviewStatus("idle");
+      setPreviewStatus("error");
+      // Auto-clear error state after 3 seconds
+      setTimeout(() => setPreviewStatus("idle"), 3000);
     }
   }
 
   const isPreviewLoading = previewStatus === "loading";
   const isPreviewPlaying = previewStatus === "playing";
+  const isPreviewError   = previewStatus === "error";
 
   return (
     <div className="w-full bg-gray-50 rounded-2xl p-4 mb-6 space-y-4">
@@ -249,12 +249,14 @@ function SettingsSection({ settings, onUpdateSetting }) {
 
       {/* Preview button */}
       <button
-        onClick={handlePreview}
+        onClick={isPreviewError ? undefined : handlePreview}
         disabled={isPreviewLoading || isPreviewPlaying}
         className={`w-full flex items-center justify-center gap-2.5 py-3 rounded-2xl text-sm font-semibold border-2 transition-all active:scale-[.98] disabled:opacity-70 ${
           isPreviewPlaying
             ? "border-blue-300 bg-blue-50 text-blue-700"
-            : "border-dashed border-gray-300 bg-white text-gray-600 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50"
+            : isPreviewError
+              ? "border-red-200 bg-red-50 text-red-500 cursor-default"
+              : "border-dashed border-gray-300 bg-white text-gray-600 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50"
         }`}
       >
         {isPreviewLoading ? (
@@ -271,6 +273,15 @@ function SettingsSection({ settings, onUpdateSetting }) {
               ))}
             </span>
             กำลังเล่นตัวอย่าง...
+          </>
+        ) : isPreviewError ? (
+          <>
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            โหลดเสียงไม่สำเร็จ กรุณาลองใหม่
           </>
         ) : (
           <>
