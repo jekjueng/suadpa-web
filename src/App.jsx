@@ -36,6 +36,10 @@ function App() {
   const autoPlaySingle = !isGuest && (settings?.autoPlaySingle ?? false);
   const autoPlayQueue  = !isGuest && (settings?.autoPlayQueue  ?? false);
 
+  // TTS voice/speed — use user setting if logged in, else defaults
+  const voiceName    = settings?.voiceName    ?? "th-TH-Neural2-C";
+  const speakingRate = settings?.speakingRate ?? 1.0;
+
   // When queue advances, update the selected chant for ReadingPage
   useEffect(() => {
     if (!isQueueMode) return;
@@ -101,6 +105,9 @@ function App() {
         onStopQueue={handleStopQueue}
         // Auto-play
         autoPlay={isQueueMode ? autoPlayQueue : autoPlaySingle}
+        // TTS voice & speed
+        voiceName={voiceName}
+        speakingRate={speakingRate}
       />
     );
   }

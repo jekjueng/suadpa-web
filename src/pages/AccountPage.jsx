@@ -84,14 +84,34 @@ function ToggleSwitch({ enabled, onChange, label, description }) {
   );
 }
 
+// ── Voice & Speed settings ───────────────────────────────────────────────────
+
+const TTS_VOICES = [
+  { value: "th-TH-Neural2-C", label: "Neural หญิง (แนะนำ)", badge: "Neural" },
+  { value: "th-TH-Neural2-B", label: "Neural ชาย",           badge: "Neural" },
+  { value: "th-TH-Wavenet-A", label: "WaveNet หญิง",         badge: "WaveNet" },
+  { value: "th-TH-Wavenet-B", label: "WaveNet ชาย",          badge: "WaveNet" },
+  { value: "th-TH-Standard-A", label: "Standard หญิง",       badge: "Standard" },
+  { value: "th-TH-Standard-B", label: "Standard ชาย",        badge: "Standard" },
+];
+
+const SPEED_OPTIONS = [
+  { value: 0.75, label: "0.75×" },
+  { value: 1.0,  label: "1.0×"  },
+  { value: 1.25, label: "1.25×" },
+  { value: 1.5,  label: "1.5×"  },
+];
+
 // ── Settings section (Logged-in only) ────────────────────────────────────────
 
 function SettingsSection({ settings, onUpdateSetting }) {
   return (
     <div className="w-full bg-gray-50 rounded-2xl p-4 mb-6 space-y-4">
-      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
         ตั้งค่าการเล่นเสียง
       </p>
+
+      {/* Auto-play toggles */}
       <ToggleSwitch
         enabled={settings.autoPlaySingle}
         onChange={(v) => onUpdateSetting("autoPlaySingle", v)}
@@ -105,6 +125,52 @@ function SettingsSection({ settings, onUpdateSetting }) {
         label="เล่นต่อเนื่องใน Playlist"
         description="ข้ามบทสวดถัดไปโดยอัตโนมัติเมื่อใช้ Play All"
       />
+
+      <div className="border-t border-gray-200" />
+
+      {/* Voice selector */}
+      <div className="space-y-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-800">เสียงอ่าน</p>
+          <p className="text-xs text-gray-400 mt-0.5">เลือกเสียงของ Google TTS</p>
+        </div>
+        <select
+          value={settings.voiceName}
+          onChange={(e) => onUpdateSetting("voiceName", e.target.value)}
+          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-blue-300 appearance-none"
+        >
+          {TTS_VOICES.map((v) => (
+            <option key={v.value} value={v.value}>
+              {v.label} — {v.badge}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="border-t border-gray-200" />
+
+      {/* Speed selector */}
+      <div className="space-y-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-800">ความเร็วการสวด</p>
+          <p className="text-xs text-gray-400 mt-0.5">ปรับอัตราเร็วของเสียง</p>
+        </div>
+        <div className="flex gap-2">
+          {SPEED_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => onUpdateSetting("speakingRate", opt.value)}
+              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95 ${
+                settings.speakingRate === opt.value
+                  ? "bg-blue-900 text-white shadow-sm"
+                  : "bg-white text-gray-600 border border-gray-200 hover:border-blue-200"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

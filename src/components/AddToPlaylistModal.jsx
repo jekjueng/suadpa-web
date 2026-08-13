@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 
 function IconCheck() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12" />
     </svg>
   );
@@ -72,32 +72,25 @@ function NewPlaylistForm({ onConfirm, onCancel }) {
   );
 }
 
-// ── Playlist Row ──────────────────────────────────────────────────────────────
+// ── Checkbox Row ──────────────────────────────────────────────────────────────
 
-function PlaylistRow({ playlist, isAdded, onToggle }) {
-  const [loading, setLoading] = useState(false);
-
-  async function handleClick() {
-    setLoading(true);
-    await onToggle(playlist.id, isAdded);
-    setLoading(false);
-  }
-
+function CheckboxRow({ playlist, checked, onChange }) {
   return (
     <button
-      onClick={handleClick}
-      disabled={loading}
+      onClick={() => onChange(playlist.id, !checked)}
       className={`w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[.98] ${
-        isAdded
-          ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-          : "bg-white border-gray-100 text-gray-800 hover:border-blue-200"
-      } disabled:opacity-60`}
+        checked
+          ? "bg-blue-50 border-blue-200"
+          : "bg-white border-gray-100 hover:border-blue-100"
+      }`}
     >
-      <span className="text-sm font-semibold truncate">{playlist.name}</span>
-      <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
-        isAdded ? "bg-emerald-500 text-white" : "border-2 border-gray-300"
+      <span className={`text-sm font-semibold truncate ${checked ? "text-blue-900" : "text-gray-800"}`}>
+        {playlist.name}
+      </span>
+      <span className={`shrink-0 w-6 h-6 rounded-md flex items-center justify-center transition-colors ${
+        checked ? "bg-blue-900 text-white" : "border-2 border-gray-300"
       }`}>
-        {isAdded && <IconCheck />}
+        {checked && <IconCheck />}
       </span>
     </button>
   );
@@ -106,12 +99,12 @@ function PlaylistRow({ playlist, isAdded, onToggle }) {
 // ── Modal ─────────────────────────────────────────────────────────────────────
 
 /**
- * Bottom-sheet modal for adding/removing a chant from multiple playlists.
+ * Bottom-sheet modal for adding a chant to multiple playlists in one batch.
  *
  * Props:
- *   chant          — the chant object being managed
- *   playlists      — full list of user's playlists
- *   chantPlaylists — array of playlistIds that already contain this chant
+ *   chant              — the chant object being managed
+ *   playlists          — full list of user's playlists [{ id, name }]
+ *   chantPlaylists     — array of playlistIds that already contain this chant
  *   onAddToPlaylist(playlistId, chant)
  *   onRemoveFromPlaylist(playlistId, chantId)
  *   onCreatePlaylist(name) → returns new playlistId
@@ -126,12 +119,15 @@ export default function AddToPlaylistModal({
   onCreatePlaylist,
   onClose,
 }) {
+  // Draft Set — starts from current membership; changes are local until "บันทึก"
+  const [draft, setDraft] = useState(() => new Set(chantPlaylists));
   const [showNewForm, setShowNewForm] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // Close on backdrop click
-  function handleBackdrop(e) {
-    if (e.target === e.currentTarget) onClose();
-  }
+  // Sync draft if chantPlaylists changes while modal is open (real-time update)
+  useEffect(() => {
+    setDraft(new Set(chantPlaylists));
+  }, [chantPlaylists.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Lock body scroll while open
   useEffect(() => {
@@ -139,22 +135,47 @@ export default function AddToPlaylistModal({
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  async function handleToggle(playlistId, isAdded) {
-    if (isAdded) {
-      await onRemoveFromPlaylist(playlistId, chant.id);
-    } else {
-      await onAddToPlaylist(playlistId, chant);
-    }
+  function handleBackdrop(e) {
+    if (e.target === e.currentTarget) onClose();
+  }
+
+  function toggleDraft(playlistId, checked) {
+    setDraft((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(playlistId);
+      else next.delete(playlistId);
+      return next;
+    });
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    const original = new Set(chantPlaylists);
+
+    const toAdd    = [...draft].filter((id) => !original.has(id));
+    const toRemove = [...original].filter((id) => !draft.has(id));
+
+    await Promise.all([
+      ...toAdd.map((id) => onAddToPlaylist(id, chant)),
+      ...toRemove.map((id) => onRemoveFromPlaylist(id, chant.id)),
+    ]);
+
+    setSaving(false);
+    onClose();
   }
 
   async function handleCreate(name) {
     const newId = await onCreatePlaylist(name);
     if (newId) {
-      // Automatically add the chant to the newly created playlist
-      await onAddToPlaylist(newId, chant);
+      // Auto-check the newly created playlist
+      setDraft((prev) => new Set([...prev, newId]));
     }
     setShowNewForm(false);
   }
+
+  const hasChanges =
+    draft.size !== chantPlaylists.length ||
+    [...draft].some((id) => !chantPlaylists.includes(id));
 
   return (
     <div
@@ -182,23 +203,23 @@ export default function AddToPlaylistModal({
           </div>
         </div>
 
-        {/* Playlist list */}
+        {/* Checkbox list */}
         <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2 space-y-2">
           {playlists.length === 0 && !showNewForm && (
             <p className="text-center text-sm text-gray-400 py-8">ยังไม่มีเพลย์ลิสต์ กดสร้างได้เลย</p>
           )}
           {playlists.map((pl) => (
-            <PlaylistRow
+            <CheckboxRow
               key={pl.id}
               playlist={pl}
-              isAdded={chantPlaylists.includes(pl.id)}
-              onToggle={handleToggle}
+              checked={draft.has(pl.id)}
+              onChange={toggleDraft}
             />
           ))}
         </div>
 
-        {/* New playlist section */}
-        <div className="px-4 pb-8 pt-3 border-t border-gray-100 bg-white">
+        {/* Footer: new playlist + save button */}
+        <div className="px-4 pb-8 pt-3 border-t border-gray-100 bg-white space-y-3">
           {showNewForm ? (
             <NewPlaylistForm
               onConfirm={handleCreate}
@@ -213,6 +234,14 @@ export default function AddToPlaylistModal({
               สร้างเพลย์ลิสต์ใหม่
             </button>
           )}
+
+          <button
+            onClick={handleSave}
+            disabled={saving || !hasChanges}
+            className="w-full bg-blue-900 text-white font-bold text-sm py-3.5 rounded-2xl shadow-sm active:scale-[.98] transition-all disabled:opacity-40"
+          >
+            {saving ? "กำลังบันทึก..." : hasChanges ? "บันทึก" : "ไม่มีการเปลี่ยนแปลง"}
+          </button>
         </div>
 
       </div>

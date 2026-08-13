@@ -178,12 +178,17 @@ export default function ReadingPage({
   onStopQueue,
   // Auto-play: true only for logged-in users with the relevant setting enabled
   autoPlay,
+  // TTS voice/speed settings from user preferences
+  voiceName,
+  speakingRate,
 }) {
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const inAnyPlaylist = (chantPlaylists?.length ?? 0) > 0;
 
   const { status, error, play, pause, resume, stop } = useGoogleTTS({
     onNaturalEnd: isQueueMode ? onNaturalEnd : undefined,
+    voiceName,
+    speakingRate,
   });
 
   // Auto-play on mount when requested

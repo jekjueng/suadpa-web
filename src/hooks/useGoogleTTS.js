@@ -2,14 +2,17 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 const GCP_TTS_URL = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${import.meta.env.VITE_GCP_TTS_API_KEY}`;
 
-async function fetchAudioDataUri(text) {
+const DEFAULT_VOICE = "th-TH-Neural2-C";
+const DEFAULT_RATE  = 1.0;
+
+async function fetchAudioDataUri(text, voiceName = DEFAULT_VOICE, speakingRate = DEFAULT_RATE) {
   const res = await fetch(GCP_TTS_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       input: { text },
-      voice: { languageCode: "th-TH", name: "th-TH-Neural2-C" },
-      audioConfig: { audioEncoding: "MP3" },
+      voice: { languageCode: "th-TH", name: voiceName },
+      audioConfig: { audioEncoding: "MP3", speakingRate },
     }),
   });
   if (!res.ok) throw new Error(`GCP TTS Error: ${res.status}`);
@@ -18,10 +21,12 @@ async function fetchAudioDataUri(text) {
 }
 
 /**
- * @param {function} [onNaturalEnd] - Called when audio finishes playing on its own
- *   (NOT when stop() is called). Used by the Run All queue to advance to next track.
+ * @param {object}   opts
+ * @param {function} [opts.onNaturalEnd]  - Called when audio finishes playing naturally.
+ * @param {string}   [opts.voiceName]     - Google Cloud TTS voice name (th-TH-*).
+ * @param {number}   [opts.speakingRate]  - Playback speed multiplier (0.25–4.0).
  */
-export function useGoogleTTS({ onNaturalEnd } = {}) {
+export function useGoogleTTS({ onNaturalEnd, voiceName, speakingRate } = {}) {
   const [status, setStatus] = useState("idle"); // "idle" | "loading" | "playing" | "paused" | "error"
   const [error, setError] = useState(null);
   const audioRef = useRef(null);
@@ -54,7 +59,7 @@ export function useGoogleTTS({ onNaturalEnd } = {}) {
     setStatus("loading");
 
     try {
-      const dataUri = await fetchAudioDataUri(text);
+      const dataUri = await fetchAudioDataUri(text, voiceName, speakingRate);
 
       const audio = new Audio(dataUri);
       audioRef.current = audio;
@@ -76,7 +81,7 @@ export function useGoogleTTS({ onNaturalEnd } = {}) {
       setStatus("error");
       setError(err.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [voiceName, speakingRate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pause = useCallback(() => {
     if (audioRef.current) {
