@@ -5,6 +5,7 @@ import {
   signInWithGoogle,
   signOutUser,
 } from "../firebase/auth";
+import { upsertUserProfile } from "../firebase/userSettings";
 
 /** Extract only serializable fields from a Firebase User object. */
 function toPlainUser(firebaseUser) {
@@ -34,6 +35,15 @@ export function useAuth() {
     const unsubscribe = subscribeToAuthState(async (firebaseUser) => {
       if (firebaseUser) {
         setUser(toPlainUser(firebaseUser));
+        // Persist Google profile to Firestore so admins can look up users
+        // by email. Fire-and-forget — don't block auth flow on this.
+        if (!firebaseUser.isAnonymous) {
+          upsertUserProfile(firebaseUser.uid, {
+            email:       firebaseUser.email,
+            displayName: firebaseUser.displayName,
+            photoURL:    firebaseUser.photoURL,
+          }).catch((err) => console.warn("upsertUserProfile failed:", err));
+        }
       } else {
         try {
           const newUser = await signInAnon();

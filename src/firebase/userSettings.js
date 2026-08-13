@@ -1,4 +1,4 @@
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "./config";
 
 export const DEFAULT_SETTINGS = {
@@ -31,4 +31,23 @@ export function subscribeToUserSettings(uid, callback) {
  */
 export async function updateUserSettings(uid, updates) {
   await setDoc(doc(db, "users", uid), updates, { merge: true });
+}
+
+/**
+ * Saves the Google user's profile fields (email, displayName, photoURL) into
+ * users/{uid} so admins can look up a user by email in the Firestore console.
+ * Uses merge:true — never overwrites isAdmin or settings fields.
+ */
+export async function upsertUserProfile(uid, { email, displayName, photoURL }) {
+  await setDoc(
+    doc(db, "users", uid),
+    {
+      uid,
+      email:       email       ?? null,
+      displayName: displayName ?? null,
+      photoURL:    photoURL    ?? null,
+      lastSeenAt:  serverTimestamp(),
+    },
+    { merge: true }
+  );
 }
