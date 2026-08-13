@@ -3,6 +3,7 @@ import {
   subscribeToPlaylist,
   addToPlaylist,
   removeFromPlaylist,
+  swapChantOrder,
 } from "../firebase/playlist";
 
 export function usePlaylist(uid) {
@@ -25,7 +26,8 @@ export function usePlaylist(uid) {
     if (playlistIds.has(chant.id)) {
       await removeFromPlaylist(uid, chant.id);
     } else {
-      await addToPlaylist(uid, chant);
+      // Pass current length so new item gets an `order` appended at the end
+      await addToPlaylist(uid, chant, playlist.length);
     }
   }
 
@@ -33,5 +35,16 @@ export function usePlaylist(uid) {
     return playlistIds.has(chantId);
   }
 
-  return { playlist, isInPlaylist, togglePlaylist };
+  /**
+   * Moves an item up (direction = -1) or down (direction = +1) in the list.
+   * Swaps `order` values of the two affected items in Firestore atomically.
+   */
+  async function reorderPlaylist(index, direction) {
+    if (!uid) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= playlist.length) return;
+    await swapChantOrder(uid, playlist[index], playlist[targetIndex]);
+  }
+
+  return { playlist, isInPlaylist, togglePlaylist, reorderPlaylist };
 }

@@ -55,7 +55,61 @@ function GuestView({ onSignIn, isLoading, error }) {
   );
 }
 
-function LoggedInView({ user, onSignOut, isLoading, error }) {
+// ── Toggle Switch ─────────────────────────────────────────────────────────────
+
+function ToggleSwitch({ enabled, onChange, label, description }) {
+  return (
+    <button
+      role="switch"
+      aria-checked={enabled}
+      onClick={() => onChange(!enabled)}
+      className="w-full flex items-center justify-between gap-4 text-left"
+    >
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-gray-800">{label}</p>
+        {description && (
+          <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{description}</p>
+        )}
+      </div>
+      {/* Track */}
+      <div className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 ${
+        enabled ? "bg-blue-900" : "bg-gray-200"
+      }`}>
+        {/* Thumb */}
+        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+          enabled ? "translate-x-5" : "translate-x-0.5"
+        }`} />
+      </div>
+    </button>
+  );
+}
+
+// ── Settings section (Logged-in only) ────────────────────────────────────────
+
+function SettingsSection({ settings, onUpdateSetting }) {
+  return (
+    <div className="w-full bg-gray-50 rounded-2xl p-4 mb-6 space-y-4">
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+        ตั้งค่าการเล่นเสียง
+      </p>
+      <ToggleSwitch
+        enabled={settings.autoPlaySingle}
+        onChange={(v) => onUpdateSetting("autoPlaySingle", v)}
+        label="เล่นเสียงอัตโนมัติ"
+        description="เริ่มสวดทันทีเมื่อเปิดบทสวด"
+      />
+      <div className="border-t border-gray-200" />
+      <ToggleSwitch
+        enabled={settings.autoPlayQueue}
+        onChange={(v) => onUpdateSetting("autoPlayQueue", v)}
+        label="เล่นต่อเนื่องใน Playlist"
+        description="ข้ามบทสวดถัดไปโดยอัตโนมัติเมื่อใช้ Play All"
+      />
+    </div>
+  );
+}
+
+function LoggedInView({ user, onSignOut, isLoading, error, settings, onUpdateSetting }) {
   return (
     <div className="flex flex-col items-center px-6 pt-10 pb-6">
       {/* Avatar */}
@@ -89,6 +143,11 @@ function LoggedInView({ user, onSignOut, isLoading, error }) {
         <div className="w-full bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4">
           <p className="text-sm text-red-600 text-center">{error}</p>
         </div>
+      )}
+
+      {/* Auto-play settings */}
+      {settings && onUpdateSetting && (
+        <SettingsSection settings={settings} onUpdateSetting={onUpdateSetting} />
       )}
 
       {/* Info cards */}
@@ -168,6 +227,8 @@ export default function AccountPage({
   onSignOut,
   canInstall,
   onInstall,
+  settings,
+  onUpdateSetting,
 }) {
   const isGuest = !user || user.isAnonymous;
 
@@ -192,6 +253,8 @@ export default function AccountPage({
               onSignOut={onSignOut}
               isLoading={isAuthLoading}
               error={authError}
+              settings={settings}
+              onUpdateSetting={onUpdateSetting}
             />
           )}
         </div>

@@ -17,10 +17,20 @@ async function fetchAudioDataUri(text) {
   return `data:audio/mp3;base64,${audioContent}`;
 }
 
-export function useGoogleTTS() {
+/**
+ * @param {function} [onNaturalEnd] - Called when audio finishes playing on its own
+ *   (NOT when stop() is called). Used by the Run All queue to advance to next track.
+ */
+export function useGoogleTTS({ onNaturalEnd } = {}) {
   const [status, setStatus] = useState("idle"); // "idle" | "loading" | "playing" | "paused" | "error"
   const [error, setError] = useState(null);
   const audioRef = useRef(null);
+  const onNaturalEndRef = useRef(onNaturalEnd);
+
+  // Keep ref in sync so the audio.onended closure always sees the latest callback
+  useEffect(() => {
+    onNaturalEndRef.current = onNaturalEnd;
+  }, [onNaturalEnd]);
 
   function destroyAudio() {
     if (audioRef.current) {
@@ -49,7 +59,11 @@ export function useGoogleTTS() {
       const audio = new Audio(dataUri);
       audioRef.current = audio;
 
-      audio.onended = () => setStatus("idle");
+      audio.onended = () => {
+        setStatus("idle");
+        // Fire natural-end callback AFTER state update so callers see idle status
+        onNaturalEndRef.current?.();
+      };
       audio.onerror = () => {
         setStatus("error");
         setError("ไม่สามารถเล่นเสียงได้ กรุณาลองใหม่");
@@ -78,6 +92,7 @@ export function useGoogleTTS() {
     }
   }, []);
 
+  // stop() intentionally does NOT fire onNaturalEnd
   const stop = useCallback(() => {
     destroyAudio();
     setStatus("idle");

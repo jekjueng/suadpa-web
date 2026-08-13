@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useGoogleTTS } from "../hooks/useGoogleTTS";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -28,6 +28,15 @@ function IconStop() {
   );
 }
 
+function IconNext() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <polygon points="5 4 15 12 5 20 5 4" />
+      <line x1="19" y1="4" x2="19" y2="20" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function IconBookmark({ filled }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24"
@@ -47,42 +56,60 @@ function LoadingSpinner({ size = 22 }) {
   );
 }
 
-// ── TTS Controls (Pure UI — no API logic here) ────────────────────────────────
+// ── Queue progress badge ──────────────────────────────────────────────────────
 
-function TTSControls({ status, error, onPlay, onPause, onResume, onStop, chantTitle }) {
+function QueueBadge({ current, total }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 bg-blue-900 text-white text-xs font-semibold px-3 py-1 rounded-full">
+      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+        <polygon points="5 3 19 12 5 21 5 3" />
+      </svg>
+      {current} / {total}
+    </span>
+  );
+}
+
+// ── TTS Controls ──────────────────────────────────────────────────────────────
+
+function TTSControls({
+  status, error,
+  onPlay, onPause, onResume, onStop,
+  onNext,
+  chantTitle,
+  isQueueMode,
+}) {
   const isLoading = status === "loading";
   const isPlaying = status === "playing";
-  const isPaused = status === "paused";
-  const isIdle = status === "idle";
-  const isError = status === "error";
-  const isActive = isPlaying || isPaused;
+  const isPaused  = status === "paused";
+  const isIdle    = status === "idle";
+  const isError   = status === "error";
 
   const statusLabel = {
-    idle: "กดเพื่อเริ่มสวด",
+    idle:    "กดเพื่อเริ่มสวด",
     loading: "กำลังโหลดเสียง...",
     playing: "กำลังสวด...",
-    paused: "หยุดชั่วคราว",
-    error: error ?? "เกิดข้อผิดพลาด",
+    paused:  "หยุดชั่วคราว",
+    error:   error ?? "เกิดข้อผิดพลาด",
   }[status];
 
   const statusColor = {
-    idle: "text-gray-400",
+    idle:    "text-gray-400",
     loading: "text-blue-500",
     playing: "text-blue-600",
-    paused: "text-amber-500",
-    error: "text-red-500",
+    paused:  "text-amber-500",
+    error:   "text-red-500",
   }[status];
 
   function handleMainAction() {
     if (isIdle || isError) return onPlay();
     if (isPlaying) return onPause();
-    if (isPaused) return onResume();
+    if (isPaused)  return onResume();
   }
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-4 pt-3 pb-3">
       <div className="flex items-center gap-3">
-        {/* Main action button */}
+        {/* Play / Pause / Resume */}
         <button
           onClick={handleMainAction}
           disabled={isLoading}
@@ -98,7 +125,18 @@ function TTSControls({ status, error, onPlay, onPause, onResume, onStop, chantTi
           <p className="text-xs text-gray-400 truncate">{chantTitle}</p>
         </div>
 
-        {/* Stop button */}
+        {/* Next track (queue mode only) */}
+        {isQueueMode && onNext && (
+          <button
+            onClick={onNext}
+            className="flex items-center justify-center w-10 h-10 rounded-xl bg-gray-100 text-gray-600 active:scale-95 transition-transform shrink-0 hover:bg-blue-50 hover:text-blue-700"
+            aria-label="บทถัดไป"
+          >
+            <IconNext />
+          </button>
+        )}
+
+        {/* Stop */}
         <button
           onClick={onStop}
           disabled={isIdle || isLoading}
@@ -121,11 +159,38 @@ function TTSControls({ status, error, onPlay, onPause, onResume, onStop, chantTi
 
 // ── ReadingPage ───────────────────────────────────────────────────────────────
 
-export default function ReadingPage({ chant, onBack, isInPlaylist, onTogglePlaylist }) {
+export default function ReadingPage({
+  chant,
+  onBack,
+  isInPlaylist,
+  onTogglePlaylist,
+  // Queue props — optional, only present during Run All
+  isQueueMode,
+  queueIndex,
+  queueTotal,
+  onNaturalEnd,
+  onNextTrack,
+  onStopQueue,
+  // Auto-play: true only for logged-in users with the relevant setting enabled
+  autoPlay,
+}) {
   const [playlistLoading, setPlaylistLoading] = useState(false);
   const inPlaylist = isInPlaylist(chant.id);
 
-  const { status, error, play, pause, resume, stop } = useGoogleTTS();
+  const { status, error, play, pause, resume, stop } = useGoogleTTS({
+    onNaturalEnd: isQueueMode ? onNaturalEnd : undefined,
+  });
+
+  // Auto-play on mount when requested
+  const autoPlayFiredRef = useRef(false);
+  useEffect(() => {
+    if (autoPlay && !autoPlayFiredRef.current) {
+      autoPlayFiredRef.current = true;
+      play(chant.content);
+    }
+    // chant.content and play are stable for this page's lifetime
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlay]);
 
   async function handleTogglePlaylist() {
     setPlaylistLoading(true);
@@ -133,12 +198,23 @@ export default function ReadingPage({ chant, onBack, isInPlaylist, onTogglePlayl
     setPlaylistLoading(false);
   }
 
+  function handleStop() {
+    stop();
+    if (isQueueMode) onStopQueue?.();
+  }
+
+  function handleBack() {
+    stop();
+    if (isQueueMode) onStopQueue?.();
+    onBack();
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Top bar */}
       <header className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3">
         <button
-          onClick={onBack}
+          onClick={handleBack}
           className="flex items-center justify-center w-9 h-9 rounded-xl bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors active:scale-95"
           aria-label="กลับหน้ารายการ"
         >
@@ -150,6 +226,9 @@ export default function ReadingPage({ chant, onBack, isInPlaylist, onTogglePlayl
         <span className="text-sm font-semibold text-blue-900 truncate flex-1">
           {chant.category}
         </span>
+        {isQueueMode && (
+          <QueueBadge current={queueIndex + 1} total={queueTotal} />
+        )}
       </header>
 
       {/* Content */}
@@ -168,18 +247,18 @@ export default function ReadingPage({ chant, onBack, isInPlaylist, onTogglePlayl
       <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-2 bg-linear-to-t from-gray-50 via-gray-50/95 to-transparent">
         <div className="max-w-md mx-auto flex flex-col gap-2">
 
-          {/* TTS Controls */}
           <TTSControls
             status={status}
             error={error}
             onPlay={() => play(chant.content)}
             onPause={pause}
             onResume={resume}
-            onStop={stop}
+            onStop={handleStop}
+            onNext={isQueueMode ? onNextTrack : undefined}
             chantTitle={chant.title}
+            isQueueMode={isQueueMode}
           />
 
-          {/* Action row */}
           <div className="flex gap-2">
             <button
               onClick={handleTogglePlaylist}
@@ -199,7 +278,7 @@ export default function ReadingPage({ chant, onBack, isInPlaylist, onTogglePlayl
             </button>
 
             <button
-              onClick={onBack}
+              onClick={handleBack}
               className="flex-1 bg-blue-900 text-white font-semibold text-sm py-3.5 rounded-2xl shadow-md active:scale-[.98] transition-transform duration-100 hover:bg-blue-800"
             >
               ← กลับ
