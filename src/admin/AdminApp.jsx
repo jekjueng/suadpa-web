@@ -3,6 +3,7 @@ import AdminGuard from "./components/AdminGuard";
 import AdminLayout from "./components/AdminLayout";
 import AdminCategoriesPage from "./pages/AdminCategoriesPage";
 import AdminChantsPage from "./pages/AdminChantsPage";
+import AdminBroadcastPage from "./pages/AdminBroadcastPage";
 
 export default function AdminApp() {
   const [currentPage, setCurrentPage] = useState("categories");
@@ -12,6 +13,7 @@ export default function AdminApp() {
       <AdminLayout currentPage={currentPage} onNavigate={setCurrentPage}>
         {currentPage === "categories" && <AdminCategoriesPage />}
         {currentPage === "chants"     && <AdminChantsPage />}
+        {currentPage === "broadcast"  && <AdminBroadcastPage />}
       </AdminLayout>
     </AdminGuard>
   );

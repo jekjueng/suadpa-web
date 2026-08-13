@@ -1,4 +1,6 @@
-import chants from "../data/chants";
+import { useChants } from "../hooks/useChants";
+
+// ── Chant card ────────────────────────────────────────────────────────────────
 
 function ChantCard({ chant, onSelect }) {
   return (
@@ -14,12 +16,22 @@ function ChantCard({ chant, onSelect }) {
   );
 }
 
+// ── Category section ──────────────────────────────────────────────────────────
+
 function CategorySection({ category, chants, onSelect }) {
   return (
     <section className="mb-6">
       <div className="flex items-center gap-3 mb-3">
+        {category.imageUrl && (
+          <img
+            src={category.imageUrl}
+            alt={category.name}
+            className="w-6 h-6 rounded-md object-cover shrink-0"
+            onError={(e) => { e.target.style.display = "none"; }}
+          />
+        )}
         <span className="text-xs font-bold tracking-widest text-blue-400 uppercase">
-          {category}
+          {category.name}
         </span>
         <div className="flex-1 h-px bg-blue-100" />
       </div>
@@ -32,8 +44,35 @@ function CategorySection({ category, chants, onSelect }) {
   );
 }
 
+// ── Skeleton loader ───────────────────────────────────────────────────────────
+
+function SkeletonCard() {
+  return (
+    <div className="bg-white rounded-2xl px-5 py-4 border border-gray-100 animate-pulse">
+      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+      <div className="h-3 bg-gray-100 rounded w-1/3" />
+    </div>
+  );
+}
+
+function SkeletonSection() {
+  return (
+    <section className="mb-6">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="h-3 bg-gray-200 rounded w-24 animate-pulse" />
+        <div className="flex-1 h-px bg-gray-100" />
+      </div>
+      <div className="flex flex-col gap-3">
+        {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+      </div>
+    </section>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
 export default function HomePage({ onSelectChant }) {
-  const categories = [...new Set(chants.map((c) => c.category))];
+  const { grouped, uncategorized, loading, error } = useChants();
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -57,14 +96,52 @@ export default function HomePage({ onSelectChant }) {
           คลังบทสวดมนต์
         </h2>
 
-        {categories.map((category) => (
-          <CategorySection
-            key={category}
-            category={category}
-            chants={chants.filter((c) => c.category === category)}
-            onSelect={onSelectChant}
-          />
-        ))}
+        {/* Error state */}
+        {error && (
+          <div className="text-center py-10 text-red-400">
+            <p className="text-3xl mb-2">⚠️</p>
+            <p className="text-sm">โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง</p>
+          </div>
+        )}
+
+        {/* Loading skeleton */}
+        {loading && !error && (
+          <>
+            <SkeletonSection />
+            <SkeletonSection />
+          </>
+        )}
+
+        {/* Grouped by category */}
+        {!loading && !error && (
+          <>
+            {grouped.map(({ category, chants }) => (
+              <CategorySection
+                key={category.id}
+                category={category}
+                chants={chants}
+                onSelect={onSelectChant}
+              />
+            ))}
+
+            {/* Chants with no category */}
+            {uncategorized.length > 0 && (
+              <CategorySection
+                category={{ id: "__none__", name: "ไม่มีหมวดหมู่", imageUrl: "" }}
+                chants={uncategorized}
+                onSelect={onSelectChant}
+              />
+            )}
+
+            {grouped.length === 0 && uncategorized.length === 0 && (
+              <div className="text-center py-16 text-gray-400">
+                <p className="text-4xl mb-3">🙏</p>
+                <p className="text-sm">ยังไม่มีบทสวด</p>
+                <p className="text-xs mt-1 text-gray-300">ผู้ดูแลระบบสามารถเพิ่มบทสวดได้ที่หน้า Admin</p>
+              </div>
+            )}
+          </>
+        )}
       </main>
     </div>
   );
