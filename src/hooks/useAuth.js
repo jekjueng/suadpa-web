@@ -6,6 +6,7 @@ import {
   signOutUser,
 } from "../firebase/auth";
 import { upsertUserProfile } from "../firebase/userSettings";
+import { checkIsAdmin } from "../firebase/adminDb";
 
 /** Extract only serializable fields from a Firebase User object. */
 function toPlainUser(firebaseUser) {
@@ -21,30 +22,35 @@ function toPlainUser(firebaseUser) {
 
 export function useAuth() {
   const [user, setUser] = useState(null);       // plain serializable user object
+  const [isAdmin, setIsAdmin] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
 
-  // When the user explicitly signs out, the next anonymous session is "fresh"
-  // (no playlist data worth preserving). Skip linkWithPopup to avoid the
-  // double-popup / popup-blocked issue caused by Firebase's internal token
-  // state not being ready on a freshly created anonymous user.
   const skipLinkingRef = useRef(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToAuthState(async (firebaseUser) => {
       if (firebaseUser) {
         setUser(toPlainUser(firebaseUser));
-        // Persist Google profile to Firestore so admins can look up users
-        // by email. Fire-and-forget — don't block auth flow on this.
+
         if (!firebaseUser.isAnonymous) {
+          // Save profile fields to Firestore (email, displayName, etc.)
           upsertUserProfile(firebaseUser.uid, {
             email:       firebaseUser.email,
             displayName: firebaseUser.displayName,
             photoURL:    firebaseUser.photoURL,
-          }).catch((err) => console.warn("upsertUserProfile failed:", err));
+          }).catch((err) => console.error("upsertUserProfile failed:", err));
+
+          // Check admin role
+          checkIsAdmin(firebaseUser.uid)
+            .then(setIsAdmin)
+            .catch(() => setIsAdmin(false));
+        } else {
+          setIsAdmin(false);
         }
       } else {
+        setIsAdmin(false);
         try {
           const newUser = await signInAnon();
           setUser(toPlainUser(newUser));
@@ -92,6 +98,7 @@ export function useAuth() {
   return {
     user,
     uid: user?.uid ?? null,
+    isAdmin,
     authReady,
     isAuthLoading,
     authError,

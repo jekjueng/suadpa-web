@@ -305,7 +305,7 @@ function SettingsSection({ settings, onUpdateSetting }) {
   );
 }
 
-function LoggedInView({ user, onSignOut, isLoading, error, settings, onUpdateSetting }) {
+function LoggedInView({ user, isAdmin, onSignOut, isLoading, error, settings, onUpdateSetting }) {
   return (
     <div className="flex flex-col items-center px-6 pt-10 pb-6">
       {/* Avatar */}
@@ -330,10 +330,48 @@ function LoggedInView({ user, onSignOut, isLoading, error, settings, onUpdateSet
         </div>
       </div>
 
-      <h2 className="text-xl font-bold text-blue-900 mb-0.5 text-center">
-        {user.displayName ?? "ผู้ใช้"}
-      </h2>
-      <p className="text-sm text-gray-500 mb-8 text-center">{user.email}</p>
+      <div className="flex items-center gap-2 mb-0.5">
+        <h2 className="text-xl font-bold text-blue-900 text-center">
+          {user.displayName ?? "ผู้ใช้"}
+        </h2>
+        {isAdmin && (
+          <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full border border-amber-200">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24"
+              fill="currentColor">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            Admin
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-gray-500 mb-6 text-center">{user.email}</p>
+
+      {/* Admin Panel shortcut */}
+      {isAdmin && (
+        <a href="/admin"
+          className="w-full flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5 mb-4 hover:bg-amber-100 transition-colors group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-amber-800">Admin Panel</p>
+              <p className="text-xs text-amber-600">จัดการหมวดหมู่และบทสวด</p>
+            </div>
+          </div>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+            fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            className="group-hover:translate-x-0.5 transition-transform">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </a>
+      )}
+
+      <div className="mb-8 w-full" />
 
       {error && (
         <div className="w-full bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4">
@@ -417,6 +455,7 @@ function InstallAppButton({ onInstall }) {
 
 export default function AccountPage({
   user,
+  isAdmin,
   isAuthLoading,
   authError,
   onSignIn,
@@ -446,6 +485,7 @@ export default function AccountPage({
           ) : (
             <LoggedInView
               user={user}
+              isAdmin={isAdmin}
               onSignOut={onSignOut}
               isLoading={isAuthLoading}
               error={authError}

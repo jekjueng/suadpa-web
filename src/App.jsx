@@ -17,7 +17,7 @@ function App() {
   const [selectedChant, setSelectedChant] = useState(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState(null); // { id, name }
 
-  const { user, uid, authReady, isAuthLoading, authError, handleGoogleSignIn, handleSignOut } = useAuth();
+  const { user, uid, isAdmin, authReady, isAuthLoading, authError, handleGoogleSignIn, handleSignOut } = useAuth();
   const {
     playlists,
     migrating,
@@ -144,6 +144,7 @@ function App() {
       {currentTab === "account" && (
         <AccountPage
           user={user}
+          isAdmin={isAdmin}
           isAuthLoading={isAuthLoading}
           authError={authError}
           onSignIn={handleGoogleSignIn}
