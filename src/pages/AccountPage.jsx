@@ -110,8 +110,23 @@ const SPEED_OPTIONS = [
 // ── Settings section (Logged-in only) ────────────────────────────────────────
 
 function SettingsSection({ settings, onUpdateSetting }) {
+  // Local draft state — updated instantly on user interaction so that
+  // handlePreview always reads the value the user just selected, not the
+  // value that may still be in transit to/from Firestore.
+  const [localVoice, setLocalVoice] = useState(settings.voiceName);
+  const [localRate,  setLocalRate]  = useState(settings.speakingRate);
+
+  // Keep local draft in sync when Firestore settings arrive (e.g. on first
+  // load or from another device), but DO NOT override while preview is active.
   const [previewStatus, setPreviewStatus] = useState("idle"); // "idle" | "loading" | "playing"
   const audioRef = useRef(null);
+
+  useEffect(() => {
+    if (previewStatus === "idle") {
+      setLocalVoice(settings.voiceName);
+      setLocalRate(settings.speakingRate);
+    }
+  }, [settings.voiceName, settings.speakingRate, previewStatus]);
 
   // Stop preview audio on unmount (e.g. navigate away)
   useEffect(() => {
@@ -123,6 +138,16 @@ function SettingsSection({ settings, onUpdateSetting }) {
     };
   }, []);
 
+  function handleVoiceChange(value) {
+    setLocalVoice(value);
+    onUpdateSetting("voiceName", value);
+  }
+
+  function handleRateChange(value) {
+    setLocalRate(value);
+    onUpdateSetting("speakingRate", value);
+  }
+
   async function handlePreview() {
     // Stop any existing preview first
     if (audioRef.current) {
@@ -132,11 +157,9 @@ function SettingsSection({ settings, onUpdateSetting }) {
 
     setPreviewStatus("loading");
     try {
-      const dataUri = await fetchAudioDataUri(
-        PREVIEW_TEXT,
-        settings.voiceName,
-        settings.speakingRate
-      );
+      // Use LOCAL draft values — guaranteed to reflect what the user
+      // just selected, regardless of Firestore round-trip timing.
+      const dataUri = await fetchAudioDataUri(PREVIEW_TEXT, localVoice, localRate);
       const audio = new Audio(dataUri);
       audioRef.current = audio;
       audio.onended = () => {
@@ -187,8 +210,8 @@ function SettingsSection({ settings, onUpdateSetting }) {
           <p className="text-xs text-gray-400 mt-0.5">เลือกเสียงของ Google TTS</p>
         </div>
         <select
-          value={settings.voiceName}
-          onChange={(e) => onUpdateSetting("voiceName", e.target.value)}
+          value={localVoice}
+          onChange={(e) => handleVoiceChange(e.target.value)}
           className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-blue-300 appearance-none"
         >
           {TTS_VOICES.map((v) => (
@@ -211,9 +234,9 @@ function SettingsSection({ settings, onUpdateSetting }) {
           {SPEED_OPTIONS.map((opt) => (
             <button
               key={opt.value}
-              onClick={() => onUpdateSetting("speakingRate", opt.value)}
+              onClick={() => handleRateChange(opt.value)}
               className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95 ${
-                settings.speakingRate === opt.value
+                localRate === opt.value
                   ? "bg-blue-900 text-white shadow-sm"
                   : "bg-white text-gray-600 border border-gray-200 hover:border-blue-200"
               }`}
@@ -241,7 +264,6 @@ function SettingsSection({ settings, onUpdateSetting }) {
           </>
         ) : isPreviewPlaying ? (
           <>
-            {/* Animated bars */}
             <span className="flex items-end gap-0.5 h-4">
               {[1,2,3].map((i) => (
                 <span key={i} className="w-0.5 bg-blue-500 rounded-full animate-bounce"
