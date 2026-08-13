@@ -1,32 +1,64 @@
+import { useState } from "react";
+import { useAuth } from "./hooks/useAuth";
+import { usePlaylist } from "./hooks/usePlaylist";
+import { useInstallPrompt } from "./hooks/useInstallPrompt";
+import HomePage from "./pages/HomePage";
+import ReadingPage from "./pages/ReadingPage";
+import PlaylistPage from "./pages/PlaylistPage";
+import AccountPage from "./pages/AccountPage";
+import BottomNav from "./components/BottomNav";
+
 function App() {
+  const [currentTab, setCurrentTab] = useState("home");
+  const [selectedChant, setSelectedChant] = useState(null);
+
+  const { user, uid, authReady, isAuthLoading, authError, handleGoogleSignIn, handleSignOut } = useAuth();
+  const { playlist, isInPlaylist, togglePlaylist } = usePlaylist(uid);
+  const { canInstall, install } = useInstallPrompt();
+
+  if (selectedChant) {
+    return (
+      <ReadingPage
+        chant={selectedChant}
+        onBack={() => setSelectedChant(null)}
+        isInPlaylist={isInPlaylist}
+        onTogglePlaylist={togglePlaylist}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-      
-      {/* ส่วนหัวของแอป (มีโลโก้และชื่อแอป) */}
-      <div className="text-center mb-10 flex flex-col items-center">
-        {/* แท็กเรียกโลโก้: ใส่ความสูง h-24 (96px) และจัดกลาง mx-auto */}
-        <img 
-          src="/suadpalogo.svg"  /* เปลี่ยน suadpa-logo.png เป็นชื่อไฟล์โลโก้จริงของคุณครับ */
-          alt="โลโก้สวดป่ะ SUADPA" 
-          className="h-24 w-auto mx-auto mb-5 drop-shadow-sm" /* ใส่เงาเล็กน้อย */
+    <div className="pb-16">
+      {currentTab === "home" && (
+        <HomePage onSelectChant={setSelectedChant} />
+      )}
+      {currentTab === "playlist" && (
+        <PlaylistPage
+          playlist={playlist}
+          onSelectChant={setSelectedChant}
+          authReady={authReady}
         />
-        
-        {/* ชื่อแอปปรับขนาดลงเล็กน้อยเพื่อให้เข้ากับโลโก้ */}
-        <h1 className="text-3xl font-bold text-blue-900 mb-1">สวดป่ะ</h1>
-        <h2 className="text-base text-gray-500 tracking-widest">SUADPA</h2>
-        <p className="text-xs text-gray-400 mt-2">จัดให้ครบ จบทุกงานบุญ</p>
-      </div>
+      )}
+      {currentTab === "account" && (
+        <AccountPage
+          user={user}
+          isAuthLoading={isAuthLoading}
+          authError={authError}
+          onSignIn={handleGoogleSignIn}
+          onSignOut={handleSignOut}
+          canInstall={canInstall}
+          onInstall={install}
+        />
+      )}
 
-      {/* กล่องเนื้อหาหลัก */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm w-full max-w-md text-center">
-        <p className="text-gray-600">
-          ยินดีต้อนรับสู่แอปพลิเคชันสวดป่ะ<br/>
-          (พื้นที่สำหรับวางเมนูและเพลย์ลิสต์ในอนาคต)
-        </p>
-      </div>
-
+      <BottomNav
+        currentTab={currentTab}
+        onTabChange={setCurrentTab}
+        playlistCount={playlist.length}
+        user={user}
+      />
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
