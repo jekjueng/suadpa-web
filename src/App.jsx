@@ -1,21 +1,32 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "./hooks/useAuth";
-import { usePlaylist } from "./hooks/usePlaylist";
+import { usePlaylists } from "./hooks/usePlaylist";
 import { useInstallPrompt } from "./hooks/useInstallPrompt";
 import { usePlayQueue } from "./hooks/usePlayQueue";
 import { useUserSettings } from "./hooks/useUserSettings";
+import { addItemToPlaylist, removeItemFromPlaylist } from "./firebase/playlist";
 import HomePage from "./pages/HomePage";
 import ReadingPage from "./pages/ReadingPage";
 import PlaylistPage from "./pages/PlaylistPage";
+import PlaylistDetailPage from "./pages/PlaylistDetailPage";
 import AccountPage from "./pages/AccountPage";
 import BottomNav from "./components/BottomNav";
 
 function App() {
   const [currentTab, setCurrentTab] = useState("home");
   const [selectedChant, setSelectedChant] = useState(null);
+  const [selectedPlaylist, setSelectedPlaylist] = useState(null); // { id, name }
 
   const { user, uid, authReady, isAuthLoading, authError, handleGoogleSignIn, handleSignOut } = useAuth();
-  const { playlist, isInPlaylist, togglePlaylist, reorderPlaylist } = usePlaylist(uid);
+  const {
+    playlists,
+    migrating,
+    getChantPlaylists,
+    isInAnyPlaylist,
+    createPlaylist,
+    renamePlaylist,
+    deletePlaylist,
+  } = usePlaylists(uid);
   const { canInstall, install } = useInstallPrompt();
   const { queue, queueIndex, isQueueMode, currentChant, startQueue, nextTrack, stopQueue } = usePlayQueue();
   const isGuest = !user || user.isAnonymous;
@@ -30,7 +41,6 @@ function App() {
     if (!isQueueMode) return;
 
     if (queueIndex >= queue.length) {
-      // Queue finished — go back to playlist
       stopQueue();
       setSelectedChant(null);
       setCurrentTab("playlist");
@@ -42,7 +52,6 @@ function App() {
   function handlePlayAll(chants) {
     if (!chants?.length) return;
     startQueue(chants, 0);
-    // selectedChant is set via the useEffect above
   }
 
   function handleStopQueue() {
@@ -55,14 +64,34 @@ function App() {
     setSelectedChant(null);
   }
 
+  // ── Playlist item operations (passed down to ReadingPage / modal) ────────────
+
+  async function handleAddToPlaylist(playlistId, chant) {
+    if (!uid) return;
+    // We need current item count — pass 0 and let Firestore order by addedAt as fallback
+    await addItemToPlaylist(uid, playlistId, chant, 0);
+  }
+
+  async function handleRemoveFromPlaylist(playlistId, chantId) {
+    if (!uid) return;
+    await removeItemFromPlaylist(uid, playlistId, chantId);
+  }
+
+  // ── Rendering ────────────────────────────────────────────────────────────────
+
   if (selectedChant) {
+    const chantPlaylists = uid ? getChantPlaylists(selectedChant.id) : [];
     return (
       <ReadingPage
         key={selectedChant.id}
         chant={selectedChant}
         onBack={handleBack}
-        isInPlaylist={isInPlaylist}
-        onTogglePlaylist={togglePlaylist}
+        // Playlist modal
+        playlists={playlists}
+        chantPlaylists={chantPlaylists}
+        onAddToPlaylist={handleAddToPlaylist}
+        onRemoveFromPlaylist={handleRemoveFromPlaylist}
+        onCreatePlaylist={createPlaylist}
         // Queue props
         isQueueMode={isQueueMode}
         queueIndex={queueIndex}
@@ -70,7 +99,7 @@ function App() {
         onNaturalEnd={nextTrack}
         onNextTrack={nextTrack}
         onStopQueue={handleStopQueue}
-        // Auto-play: queue mode uses autoPlayQueue, single chant uses autoPlaySingle
+        // Auto-play
         autoPlay={isQueueMode ? autoPlayQueue : autoPlaySingle}
       />
     );
@@ -81,16 +110,30 @@ function App() {
       {currentTab === "home" && (
         <HomePage onSelectChant={setSelectedChant} />
       )}
-      {currentTab === "playlist" && (
+
+      {currentTab === "playlist" && !selectedPlaylist && (
         <PlaylistPage
-          playlist={playlist}
+          playlists={playlists}
+          migrating={migrating}
+          authReady={authReady}
+          onOpenPlaylist={setSelectedPlaylist}
+          onCreatePlaylist={createPlaylist}
+          onRenamePlaylist={renamePlaylist}
+          onDeletePlaylist={deletePlaylist}
+        />
+      )}
+
+      {currentTab === "playlist" && selectedPlaylist && (
+        <PlaylistDetailPage
+          uid={uid}
+          playlist={selectedPlaylist}
+          onBack={() => setSelectedPlaylist(null)}
           onSelectChant={setSelectedChant}
           onPlayAll={handlePlayAll}
-          onReorder={reorderPlaylist}
-          authReady={authReady}
           nowPlayingId={isQueueMode ? currentChant?.id : null}
         />
       )}
+
       {currentTab === "account" && (
         <AccountPage
           user={user}
@@ -107,8 +150,12 @@ function App() {
 
       <BottomNav
         currentTab={currentTab}
-        onTabChange={setCurrentTab}
-        playlistCount={playlist.length}
+        onTabChange={(tab) => {
+          // Reset playlist drill-down when switching away
+          if (tab !== "playlist") setSelectedPlaylist(null);
+          setCurrentTab(tab);
+        }}
+        playlistCount={playlists.length}
         user={user}
       />
     </div>

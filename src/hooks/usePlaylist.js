@@ -1,50 +1,141 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
-  subscribeToPlaylist,
-  addToPlaylist,
-  removeFromPlaylist,
-  swapChantOrder,
+  subscribeToplaylists,
+  subscribeToPlaylistItems,
+  subscribeToAllItems,
+  createPlaylist,
+  renamePlaylist,
+  deletePlaylist,
+  addItemToPlaylist,
+  removeItemFromPlaylist,
+  swapItemOrder,
+  migrateOldPlaylist,
 } from "../firebase/playlist";
 
-export function usePlaylist(uid) {
-  const [playlist, setPlaylist] = useState([]);
-  const [playlistIds, setPlaylistIds] = useState(new Set());
+// ── usePlaylists ──────────────────────────────────────────────────────────────
+// Manages the list of playlists and the chantId→[playlistIds] membership map.
 
+export function usePlaylists(uid) {
+  const [playlists, setPlaylists] = useState([]);
+  const [chantPlaylistMap, setChantPlaylistMap] = useState({}); // { chantId: [playlistId] }
+  const [migrating, setMigrating] = useState(false);
+
+  // Subscribe to playlists list
   useEffect(() => {
     if (!uid) return;
-
-    const unsubscribe = subscribeToPlaylist(uid, (items) => {
-      setPlaylist(items);
-      setPlaylistIds(new Set(items.map((i) => i.id)));
-    });
-
-    return () => unsubscribe();
+    const unsub = subscribeToplaylists(uid, setPlaylists);
+    return () => unsub();
   }, [uid]);
 
-  async function togglePlaylist(chant) {
+  // Run migration once on first load
+  useEffect(() => {
     if (!uid) return;
-    if (playlistIds.has(chant.id)) {
-      await removeFromPlaylist(uid, chant.id);
-    } else {
-      // Pass current length so new item gets an `order` appended at the end
-      await addToPlaylist(uid, chant, playlist.length);
+    let cancelled = false;
+    async function runMigration() {
+      setMigrating(true);
+      try {
+        await migrateOldPlaylist(uid);
+      } catch {
+        // Non-critical — migration failure is silent
+      } finally {
+        if (!cancelled) setMigrating(false);
+      }
     }
+    runMigration();
+    return () => { cancelled = true; };
+  }, [uid]);
+
+  // Subscribe to ALL items across all playlists for membership lookup
+  useEffect(() => {
+    if (!uid || !playlists.length) {
+      setChantPlaylistMap({});
+      return;
+    }
+    const unsub = subscribeToAllItems(uid, playlists, setChantPlaylistMap);
+    return () => unsub();
+  }, [uid, playlists]);
+
+  // Returns the playlist IDs that contain this chant
+  function getChantPlaylists(chantId) {
+    return chantPlaylistMap[chantId] ?? [];
   }
 
-  function isInPlaylist(chantId) {
-    return playlistIds.has(chantId);
+  function isInAnyPlaylist(chantId) {
+    return (chantPlaylistMap[chantId]?.length ?? 0) > 0;
   }
 
-  /**
-   * Moves an item up (direction = -1) or down (direction = +1) in the list.
-   * Swaps `order` values of the two affected items in Firestore atomically.
-   */
-  async function reorderPlaylist(index, direction) {
-    if (!uid) return;
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= playlist.length) return;
-    await swapChantOrder(uid, playlist[index], playlist[targetIndex]);
-  }
+  const handleCreatePlaylist = useCallback(
+    async (name) => {
+      if (!uid || !name.trim()) return null;
+      return await createPlaylist(uid, name, playlists.length);
+    },
+    [uid, playlists.length]
+  );
 
-  return { playlist, isInPlaylist, togglePlaylist, reorderPlaylist };
+  const handleRenamePlaylist = useCallback(
+    async (playlistId, newName) => {
+      if (!uid) return;
+      await renamePlaylist(uid, playlistId, newName);
+    },
+    [uid]
+  );
+
+  const handleDeletePlaylist = useCallback(
+    async (playlistId) => {
+      if (!uid) return;
+      await deletePlaylist(uid, playlistId);
+    },
+    [uid]
+  );
+
+  return {
+    playlists,
+    migrating,
+    getChantPlaylists,
+    isInAnyPlaylist,
+    createPlaylist: handleCreatePlaylist,
+    renamePlaylist: handleRenamePlaylist,
+    deletePlaylist: handleDeletePlaylist,
+  };
+}
+
+// ── usePlaylistItems ──────────────────────────────────────────────────────────
+// Manages the items inside a single playlist.
+
+export function usePlaylistItems(uid, playlistId) {
+  const [items, setItems] = useState([]);
+
+  useEffect(() => {
+    if (!uid || !playlistId) return;
+    const unsub = subscribeToPlaylistItems(uid, playlistId, setItems);
+    return () => unsub();
+  }, [uid, playlistId]);
+
+  const addItem = useCallback(
+    async (chant) => {
+      if (!uid || !playlistId) return;
+      await addItemToPlaylist(uid, playlistId, chant, items.length);
+    },
+    [uid, playlistId, items.length]
+  );
+
+  const removeItem = useCallback(
+    async (chantId) => {
+      if (!uid || !playlistId) return;
+      await removeItemFromPlaylist(uid, playlistId, chantId);
+    },
+    [uid, playlistId]
+  );
+
+  const reorderItems = useCallback(
+    async (index, direction) => {
+      if (!uid || !playlistId) return;
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= items.length) return;
+      await swapItemOrder(uid, playlistId, items[index], items[targetIndex]);
+    },
+    [uid, playlistId, items]
+  );
+
+  return { items, addItem, removeItem, reorderItems };
 }

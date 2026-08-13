@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useGoogleTTS } from "../hooks/useGoogleTTS";
+import AddToPlaylistModal from "../components/AddToPlaylistModal";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -162,8 +163,12 @@ function TTSControls({
 export default function ReadingPage({
   chant,
   onBack,
-  isInPlaylist,
-  onTogglePlaylist,
+  // Playlist modal props
+  playlists,
+  chantPlaylists,           // [playlistId] that contain this chant
+  onAddToPlaylist,          // (playlistId, chant)
+  onRemoveFromPlaylist,     // (playlistId, chantId)
+  onCreatePlaylist,         // (name) → id
   // Queue props — optional, only present during Run All
   isQueueMode,
   queueIndex,
@@ -174,8 +179,8 @@ export default function ReadingPage({
   // Auto-play: true only for logged-in users with the relevant setting enabled
   autoPlay,
 }) {
-  const [playlistLoading, setPlaylistLoading] = useState(false);
-  const inPlaylist = isInPlaylist(chant.id);
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const inAnyPlaylist = (chantPlaylists?.length ?? 0) > 0;
 
   const { status, error, play, pause, resume, stop } = useGoogleTTS({
     onNaturalEnd: isQueueMode ? onNaturalEnd : undefined,
@@ -191,12 +196,6 @@ export default function ReadingPage({
     // chant.content and play are stable for this page's lifetime
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPlay]);
-
-  async function handleTogglePlaylist() {
-    setPlaylistLoading(true);
-    await onTogglePlaylist(chant);
-    setPlaylistLoading(false);
-  }
 
   function handleStop() {
     stop();
@@ -261,20 +260,15 @@ export default function ReadingPage({
 
           <div className="flex gap-2">
             <button
-              onClick={handleTogglePlaylist}
-              disabled={playlistLoading}
+              onClick={() => setShowPlaylistModal(true)}
               className={`flex-1 flex items-center justify-center gap-2 font-semibold text-sm py-3.5 rounded-2xl shadow-sm active:scale-[.98] transition-all duration-150 ${
-                inPlaylist
+                inAnyPlaylist
                   ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                   : "bg-white text-blue-700 border border-blue-200"
-              } disabled:opacity-60`}
+              }`}
             >
-              {playlistLoading ? (
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <IconBookmark filled={inPlaylist} />
-              )}
-              {inPlaylist ? "นำออก" : "+ เพลย์ลิสต์"}
+              <IconBookmark filled={inAnyPlaylist} />
+              {inAnyPlaylist ? "บันทึกแล้ว" : "+ เพลย์ลิสต์"}
             </button>
 
             <button
@@ -287,6 +281,19 @@ export default function ReadingPage({
 
         </div>
       </div>
+
+      {/* Add to Playlist Modal */}
+      {showPlaylistModal && (
+        <AddToPlaylistModal
+          chant={chant}
+          playlists={playlists ?? []}
+          chantPlaylists={chantPlaylists ?? []}
+          onAddToPlaylist={onAddToPlaylist}
+          onRemoveFromPlaylist={onRemoveFromPlaylist}
+          onCreatePlaylist={onCreatePlaylist}
+          onClose={() => setShowPlaylistModal(false)}
+        />
+      )}
     </div>
   );
 }

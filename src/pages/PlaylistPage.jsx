@@ -1,120 +1,219 @@
+import { useState } from "react";
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+
+function IconPlus() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+function IconEdit() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+
+function IconTrash() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6M14 11v6" />
+      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    </svg>
+  );
+}
+
+function IconChevronRight() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  );
+}
+
+// ── Create / Rename inline form ───────────────────────────────────────────────
+
+function NameForm({ initialValue = "", placeholder = "ชื่อเพลย์ลิสต์", onConfirm, onCancel }) {
+  const [value, setValue] = useState(initialValue);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!value.trim()) return;
+    setLoading(true);
+    await onConfirm(value.trim());
+    setLoading(false);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex gap-2 w-full">
+      <input
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={placeholder}
+        maxLength={60}
+        className="flex-1 bg-white border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-300"
+      />
+      <button
+        type="submit"
+        disabled={!value.trim() || loading}
+        className="bg-blue-900 text-white text-sm font-semibold px-4 py-2.5 rounded-xl disabled:opacity-40 active:scale-95 transition-transform"
+      >
+        {loading ? "..." : "บันทึก"}
+      </button>
+      <button type="button" onClick={onCancel} className="text-gray-400 text-sm px-2 hover:text-gray-600">
+        ยกเลิก
+      </button>
+    </form>
+  );
+}
+
+// ── Delete Confirm ────────────────────────────────────────────────────────────
+
+function DeleteConfirm({ playlistName, onConfirm, onCancel }) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleConfirm() {
+    setLoading(true);
+    await onConfirm();
+    setLoading(false);
+  }
+
+  return (
+    <div className="mt-2 p-3 bg-red-50 border border-red-100 rounded-xl text-sm">
+      <p className="text-red-700 font-medium">ลบ "{playlistName}" และบทสวดทั้งหมดในนั้น?</p>
+      <div className="flex gap-2 mt-2">
+        <button
+          onClick={handleConfirm}
+          disabled={loading}
+          className="bg-red-600 text-white font-semibold px-4 py-1.5 rounded-lg text-xs disabled:opacity-50 active:scale-95 transition-transform"
+        >
+          {loading ? "กำลังลบ..." : "ลบเลย"}
+        </button>
+        <button onClick={onCancel} className="text-gray-500 text-xs px-3 py-1.5 hover:text-gray-700">
+          ยกเลิก
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Playlist Card ─────────────────────────────────────────────────────────────
+
+function PlaylistCard({ playlist, onOpen, onRename, onDelete }) {
+  const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  async function handleRename(newName) {
+    await onRename(playlist.id, newName);
+    setEditing(false);
+  }
+
+  async function handleDelete() {
+    await onDelete(playlist.id);
+    setConfirmDelete(false);
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      {editing ? (
+        <div className="p-4">
+          <NameForm
+            initialValue={playlist.name}
+            onConfirm={handleRename}
+            onCancel={() => setEditing(false)}
+          />
+        </div>
+      ) : (
+        <button
+          onClick={() => onOpen(playlist)}
+          className="w-full flex items-center gap-3 px-4 py-4 text-left hover:bg-blue-50 active:scale-[.99] transition-all"
+        >
+          {/* Emoji / thumbnail */}
+          <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center shrink-0 text-xl">
+            📿
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-base font-bold text-blue-900 truncate">{playlist.name}</p>
+          </div>
+          <IconChevronRight />
+        </button>
+      )}
+
+      {/* Action bar */}
+      {!editing && (
+        <div className="flex border-t border-gray-50">
+          <button
+            onClick={() => { setConfirmDelete(false); setEditing(true); }}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs text-gray-500 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+          >
+            <IconEdit /> แก้ชื่อ
+          </button>
+          <div className="w-px bg-gray-100" />
+          <button
+            onClick={() => { setEditing(false); setConfirmDelete((v) => !v); }}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <IconTrash /> ลบ
+          </button>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="px-4 pb-4">
+          <DeleteConfirm
+            playlistName={playlist.name}
+            onConfirm={handleDelete}
+            onCancel={() => setConfirmDelete(false)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
-      <div className="text-5xl mb-4">📿</div>
-      <p className="text-gray-500 font-medium">ยังไม่มีบทสวดในเพลย์ลิสต์</p>
+      <div className="text-5xl mb-4">🎵</div>
+      <p className="text-gray-500 font-medium">ยังไม่มีเพลย์ลิสต์</p>
       <p className="text-sm text-gray-400 mt-2 leading-relaxed">
-        ไปที่คลังบทสวด แล้วกด<br />
-        "เพิ่มเข้าเพลย์ลิสต์" ได้เลยครับ
+        กด "+ สร้างเพลย์ลิสต์ใหม่" เพื่อเริ่มจัดหมวดหมู่<br />บทสวดของคุณได้เลยครับ
       </p>
     </div>
   );
 }
 
-function IconArrowUp() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="18 15 12 9 6 15" />
-    </svg>
-  );
-}
-
-function IconArrowDown() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="6 9 12 15 18 9" />
-    </svg>
-  );
-}
-
-function IconPlayAll() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-      <polygon points="5 3 19 12 5 21 5 3" />
-    </svg>
-  );
-}
-
-function NowPlayingBars() {
-  return (
-    <span className="flex items-end gap-0.5 h-4 shrink-0" aria-label="กำลังเล่น">
-      {[1, 2, 3].map((i) => (
-        <span
-          key={i}
-          className="w-0.5 bg-blue-500 rounded-full animate-bounce"
-          style={{ height: `${[10, 14, 8][i - 1]}px`, animationDelay: `${(i - 1) * 0.15}s` }}
-        />
-      ))}
-    </span>
-  );
-}
-
-function PlaylistCard({ chant, index, total, isNowPlaying, onSelect, onMoveUp, onMoveDown }) {
-  return (
-    <div className={`relative flex items-center gap-2 rounded-2xl border transition-all duration-150 ${
-      isNowPlaying
-        ? "bg-blue-50 border-blue-300 shadow-md"
-        : "bg-white border-gray-100 shadow-sm hover:border-blue-200 hover:shadow-md"
-    }`}>
-      {/* Reorder buttons */}
-      <div className="flex flex-col gap-0.5 pl-3 py-3 shrink-0">
-        <button
-          onClick={onMoveUp}
-          disabled={index === 0}
-          className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-blue-700 disabled:opacity-20 transition-colors active:scale-95"
-          aria-label={`เลื่อนขึ้น ${chant.title}`}
-        >
-          <IconArrowUp />
-        </button>
-        <button
-          onClick={onMoveDown}
-          disabled={index === total - 1}
-          className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-blue-700 disabled:opacity-20 transition-colors active:scale-95"
-          aria-label={`เลื่อนลง ${chant.title}`}
-        >
-          <IconArrowDown />
-        </button>
-      </div>
-
-      {/* Main tap area */}
-      <button
-        onClick={() => onSelect(chant)}
-        className="flex-1 text-left py-4 pr-4 min-w-0"
-      >
-        <div className="flex items-center gap-2">
-          {isNowPlaying && <NowPlayingBars />}
-          <span className={`text-xs font-semibold tracking-wider uppercase ${
-            isNowPlaying ? "text-blue-500" : "text-blue-400"
-          }`}>
-            {chant.category}
-          </span>
-        </div>
-        <p className={`text-base font-semibold leading-snug mt-0.5 ${
-          isNowPlaying ? "text-blue-700" : "text-blue-900"
-        }`}>
-          {chant.title}
-        </p>
-        {!isNowPlaying && (
-          <span className="block text-xs text-gray-400 mt-1">กดเพื่ออ่านบทสวด →</span>
-        )}
-        {isNowPlaying && (
-          <span className="block text-xs text-blue-500 font-medium mt-1">กำลังเล่นอยู่</span>
-        )}
-      </button>
-    </div>
-  );
-}
+// ── PlaylistPage ──────────────────────────────────────────────────────────────
 
 export default function PlaylistPage({
-  playlist,
-  onSelectChant,
-  onPlayAll,
+  playlists,
+  migrating,
   authReady,
-  nowPlayingId,
-  onReorder,
+  onOpenPlaylist,
+  onCreatePlaylist,
+  onRenamePlaylist,
+  onDeletePlaylist,
 }) {
+  const [showCreateForm, setShowCreateForm] = useState(false);
+
+  async function handleCreate(name) {
+    await onCreatePlaylist(name);
+    setShowCreateForm(false);
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col pb-20">
       {/* Header */}
@@ -122,47 +221,50 @@ export default function PlaylistPage({
         <div className="max-w-md mx-auto">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-blue-900">เพลย์ลิสต์ของฉัน</h1>
-              {authReady && playlist.length > 0 && (
-                <p className="text-sm text-gray-400 mt-0.5">{playlist.length} บทสวด</p>
+              <h1 className="text-2xl font-bold text-blue-900">เพลย์ลิสต์</h1>
+              {authReady && playlists.length > 0 && (
+                <p className="text-sm text-gray-400 mt-0.5">{playlists.length} รายการ</p>
               )}
             </div>
-
-            {/* Play All button */}
-            {playlist.length > 0 && (
-              <button
-                onClick={() => onPlayAll(playlist)}
-                className="flex items-center gap-2 bg-blue-900 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm active:scale-95 transition-transform hover:bg-blue-800"
-                aria-label="เล่นทั้งหมด"
-              >
-                <IconPlayAll />
-                เล่นทั้งหมด
-              </button>
-            )}
+            <button
+              onClick={() => setShowCreateForm((v) => !v)}
+              className="flex items-center gap-1.5 bg-blue-900 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm active:scale-95 transition-transform hover:bg-blue-800"
+            >
+              <IconPlus />
+              สร้างใหม่
+            </button>
           </div>
+          {/* Inline create form */}
+          {showCreateForm && (
+            <div className="mt-4">
+              <NameForm
+                placeholder="ชื่อเพลย์ลิสต์ใหม่"
+                onConfirm={handleCreate}
+                onCancel={() => setShowCreateForm(false)}
+              />
+            </div>
+          )}
         </div>
       </header>
 
       {/* Content */}
       <main className="flex-1 px-4 pt-4 max-w-md mx-auto w-full">
-        {!authReady ? (
-          <div className="flex justify-center py-20">
+        {!authReady || migrating ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
             <div className="w-6 h-6 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+            {migrating && <p className="text-xs text-gray-400">กำลังย้ายข้อมูลเพลย์ลิสต์เดิม...</p>}
           </div>
-        ) : playlist.length === 0 ? (
+        ) : playlists.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="flex flex-col gap-2.5">
-            {playlist.map((chant, index) => (
+          <div className="flex flex-col gap-3">
+            {playlists.map((pl) => (
               <PlaylistCard
-                key={chant.id}
-                chant={chant}
-                index={index}
-                total={playlist.length}
-                isNowPlaying={chant.id === nowPlayingId}
-                onSelect={onSelectChant}
-                onMoveUp={() => onReorder(index, -1)}
-                onMoveDown={() => onReorder(index, +1)}
+                key={pl.id}
+                playlist={pl}
+                onOpen={onOpenPlaylist}
+                onRename={onRenamePlaylist}
+                onDelete={onDeletePlaylist}
               />
             ))}
           </div>
