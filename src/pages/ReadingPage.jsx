@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useGoogleTTS } from "../hooks/useGoogleTTS";
 import AddToPlaylistModal from "../components/AddToPlaylistModal";
+import { incrementChantView } from "../firebase/chantStats";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -190,6 +191,12 @@ export default function ReadingPage({
     voiceName,
     speakingRate,
   });
+
+  // Count this view once per mount (App.jsx uses key={chant.id} so each chant remounts)
+  useEffect(() => {
+    incrementChantView(chant.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-play on mount when requested
   const autoPlayFiredRef = useRef(false);

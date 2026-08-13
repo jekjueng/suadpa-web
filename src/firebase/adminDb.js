@@ -8,7 +8,10 @@ import {
   deleteDoc,
   query,
   orderBy,
+  where,
   serverTimestamp,
+  limit,
+  getCountFromServer,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "./config";
@@ -131,4 +134,82 @@ export async function updateChant(id, { title, content, translation, categoryIds
 
 export async function deleteChant(id) {
   await deleteDoc(chantDoc(id));
+}
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Derive a unified `role` string from the stored fields.
+ * Existing docs only have `isAdmin: boolean`; new docs will also have `role`.
+ */
+function normalizeRole(data) {
+  if (data.role) return data.role;
+  if (data.isAdmin === true) return "admin";
+  return "user";
+}
+
+/**
+ * Fetch all non-anonymous user profiles (docs that have an email address),
+ * ordered by most-recently-seen first. Capped at 500 for safety.
+ */
+export async function getUsers() {
+  const q = query(
+    collection(db, "users"),
+    orderBy("lastSeenAt", "desc"),
+    limit(500)
+  );
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data(), role: normalizeRole(d.data()) }))
+    .filter((u) => u.email); // exclude anonymous users (no email)
+}
+
+/**
+ * Update a user's role in Firestore.
+ * Writes both `role` (new field) and `isAdmin` (legacy field) for compatibility.
+ */
+export async function updateUserRole(uid, role) {
+  await updateDoc(doc(db, "users", uid), {
+    role,
+    isAdmin: role === "admin",
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// ── Dashboard / Analytics ─────────────────────────────────────────────────────
+
+/**
+ * Returns KPI counts using getCountFromServer — costs exactly 3 Firestore reads
+ * regardless of how many documents exist in each collection.
+ */
+export async function getDashboardStats() {
+  const [usersSnap, catsSnap, chantsSnap] = await Promise.all([
+    getCountFromServer(
+      query(collection(db, "users"), where("email", "!=", null))
+    ),
+    getCountFromServer(collection(db, "categories")),
+    getCountFromServer(
+      query(collection(db, "chants"), where("status", "==", "published"))
+    ),
+  ]);
+
+  return {
+    usersCount:      usersSnap.data().count,
+    categoriesCount: catsSnap.data().count,
+    chantsCount:     chantsSnap.data().count,
+  };
+}
+
+/**
+ * Returns the top N chants ordered by viewCount descending.
+ * Uses a single-field index (auto-created by Firestore) — no composite index needed.
+ */
+export async function getTopChants(n = 5) {
+  const q = query(
+    collection(db, "chants"),
+    orderBy("viewCount", "desc"),
+    limit(n)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(normalizeChant);
 }
