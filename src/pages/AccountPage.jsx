@@ -1,3 +1,8 @@
+import { useState, useEffect, useRef } from "react";
+import { fetchAudioDataUri } from "../hooks/useGoogleTTS";
+
+const PREVIEW_TEXT = "ลองสวดมนต์ไปกับฉันมั้ย";
+
 function IconGoogle() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
@@ -105,6 +110,53 @@ const SPEED_OPTIONS = [
 // ── Settings section (Logged-in only) ────────────────────────────────────────
 
 function SettingsSection({ settings, onUpdateSetting }) {
+  const [previewStatus, setPreviewStatus] = useState("idle"); // "idle" | "loading" | "playing"
+  const audioRef = useRef(null);
+
+  // Stop preview audio on unmount (e.g. navigate away)
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  async function handlePreview() {
+    // Stop any existing preview first
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    setPreviewStatus("loading");
+    try {
+      const dataUri = await fetchAudioDataUri(
+        PREVIEW_TEXT,
+        settings.voiceName,
+        settings.speakingRate
+      );
+      const audio = new Audio(dataUri);
+      audioRef.current = audio;
+      audio.onended = () => {
+        setPreviewStatus("idle");
+        audioRef.current = null;
+      };
+      audio.onerror = () => {
+        setPreviewStatus("idle");
+        audioRef.current = null;
+      };
+      await audio.play();
+      setPreviewStatus("playing");
+    } catch {
+      setPreviewStatus("idle");
+    }
+  }
+
+  const isPreviewLoading = previewStatus === "loading";
+  const isPreviewPlaying = previewStatus === "playing";
+
   return (
     <div className="w-full bg-gray-50 rounded-2xl p-4 mb-6 space-y-4">
       <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
@@ -171,6 +223,42 @@ function SettingsSection({ settings, onUpdateSetting }) {
           ))}
         </div>
       </div>
+
+      {/* Preview button */}
+      <button
+        onClick={handlePreview}
+        disabled={isPreviewLoading || isPreviewPlaying}
+        className={`w-full flex items-center justify-center gap-2.5 py-3 rounded-2xl text-sm font-semibold border-2 transition-all active:scale-[.98] disabled:opacity-70 ${
+          isPreviewPlaying
+            ? "border-blue-300 bg-blue-50 text-blue-700"
+            : "border-dashed border-gray-300 bg-white text-gray-600 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50"
+        }`}
+      >
+        {isPreviewLoading ? (
+          <>
+            <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+            กำลังโหลดเสียงตัวอย่าง...
+          </>
+        ) : isPreviewPlaying ? (
+          <>
+            {/* Animated bars */}
+            <span className="flex items-end gap-0.5 h-4">
+              {[1,2,3].map((i) => (
+                <span key={i} className="w-0.5 bg-blue-500 rounded-full animate-bounce"
+                  style={{ height: `${[10,14,8][i-1]}px`, animationDelay: `${(i-1)*0.15}s` }} />
+              ))}
+            </span>
+            กำลังเล่นตัวอย่าง...
+          </>
+        ) : (
+          <>
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            ฟังเสียงตัวอย่าง
+          </>
+        )}
+      </button>
     </div>
   );
 }

@@ -6,8 +6,20 @@ import {
   signOutUser,
 } from "../firebase/auth";
 
+/** Extract only serializable fields from a Firebase User object. */
+function toPlainUser(firebaseUser) {
+  if (!firebaseUser) return null;
+  return {
+    uid:         firebaseUser.uid,
+    email:       firebaseUser.email,
+    displayName: firebaseUser.displayName,
+    photoURL:    firebaseUser.photoURL,
+    isAnonymous: firebaseUser.isAnonymous,
+  };
+}
+
 export function useAuth() {
-  const [user, setUser] = useState(null);       // full Firebase User object
+  const [user, setUser] = useState(null);       // plain serializable user object
   const [authReady, setAuthReady] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
@@ -15,11 +27,11 @@ export function useAuth() {
   useEffect(() => {
     const unsubscribe = subscribeToAuthState(async (firebaseUser) => {
       if (firebaseUser) {
-        setUser(firebaseUser);
+        setUser(toPlainUser(firebaseUser));
       } else {
         try {
           const newUser = await signInAnon();
-          setUser(newUser);
+          setUser(toPlainUser(newUser));
         } catch (err) {
           console.error("Anonymous sign-in failed:", err);
         }
@@ -35,7 +47,7 @@ export function useAuth() {
     setAuthError(null);
     try {
       const { user: signedInUser } = await signInWithGoogle();
-      setUser(signedInUser);
+      setUser(toPlainUser(signedInUser));
     } catch (err) {
       if (err.code !== "auth/popup-closed-by-user" && err.code !== "auth/cancelled-popup-request") {
         setAuthError(err.message || "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่");

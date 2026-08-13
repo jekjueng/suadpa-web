@@ -5,17 +5,33 @@ const GCP_TTS_URL = `https://texttospeech.googleapis.com/v1/text:synthesize?key=
 const DEFAULT_VOICE = "th-TH-Neural2-C";
 const DEFAULT_RATE  = 1.0;
 
-async function fetchAudioDataUri(text, voiceName = DEFAULT_VOICE, speakingRate = DEFAULT_RATE) {
+export async function fetchAudioDataUri(text, voiceName = DEFAULT_VOICE, speakingRate = DEFAULT_RATE) {
+  // Sanitise inputs — Firestore may return strings or falsy values
+  const safeVoice = (typeof voiceName === "string" && voiceName.trim()) ? voiceName.trim() : DEFAULT_VOICE;
+  const safeRate  = parseFloat(speakingRate);
+  const rate      = isNaN(safeRate) || safeRate <= 0 ? DEFAULT_RATE : Math.min(Math.max(safeRate, 0.25), 4.0);
+  // Derive languageCode from the first 5 chars of the voice name (e.g. "th-TH")
+  const languageCode = safeVoice.substring(0, 5);
+
+  const payload = {
+    input: { text },
+    voice: { languageCode, name: safeVoice },
+    audioConfig: { audioEncoding: "MP3", speakingRate: rate },
+  };
+
+  console.log("[GCP TTS] payload:", JSON.stringify(payload, null, 2));
+
   const res = await fetch(GCP_TTS_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      input: { text },
-      voice: { languageCode: "th-TH", name: voiceName },
-      audioConfig: { audioEncoding: "MP3", speakingRate },
-    }),
+    body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(`GCP TTS Error: ${res.status}`);
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`GCP TTS Error: ${res.status} — ${errBody}`);
+  }
+
   const { audioContent } = await res.json();
   return `data:audio/mp3;base64,${audioContent}`;
 }
