@@ -235,7 +235,7 @@ export default function ReadingPage({
           </svg>
         </button>
         <span className="text-sm font-semibold text-blue-900 truncate flex-1">
-          {chant.category}
+          {chant._categoryName ?? chant.category ?? ""}
         </span>
         {isQueueMode && (
           <QueueBadge current={queueIndex + 1} total={queueTotal} />

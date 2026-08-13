@@ -90,7 +90,7 @@ function ChantCard({ chant, index, total, isNowPlaying, onSelect, onMoveUp, onMo
           <span className={`text-xs font-semibold tracking-wider uppercase ${
             isNowPlaying ? "text-blue-500" : "text-blue-400"
           }`}>
-            {chant.category}
+            {chant._categoryName ?? chant.category ?? "บทสวด"}
           </span>
         </div>
         <p className={`text-base font-semibold leading-snug mt-0.5 ${

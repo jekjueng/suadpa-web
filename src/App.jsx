@@ -6,6 +6,7 @@ import { usePlayQueue } from "./hooks/usePlayQueue";
 import { useUserSettings } from "./hooks/useUserSettings";
 import { addItemToPlaylist, removeItemFromPlaylist } from "./firebase/playlist";
 import HomePage from "./pages/HomePage";
+import CategoryDetailPage from "./pages/CategoryDetailPage";
 import ReadingPage from "./pages/ReadingPage";
 import PlaylistPage from "./pages/PlaylistPage";
 import PlaylistDetailPage from "./pages/PlaylistDetailPage";
@@ -14,6 +15,7 @@ import BottomNav from "./components/BottomNav";
 
 function App() {
   const [currentTab, setCurrentTab] = useState("home");
+  const [selectedCategory, setSelectedCategory] = useState(null); // category object
   const [selectedChant, setSelectedChant] = useState(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState(null); // { id, name }
 
@@ -66,6 +68,8 @@ function App() {
   function handleBack() {
     if (isQueueMode) stopQueue();
     setSelectedChant(null);
+    // If chant was opened from a category, return to that category
+    // (selectedCategory is preserved)
   }
 
   // ── Playlist item operations (passed down to ReadingPage / modal) ────────────
@@ -114,8 +118,18 @@ function App() {
 
   return (
     <div className="pb-16">
-      {currentTab === "home" && (
-        <HomePage onSelectChant={setSelectedChant} />
+      {currentTab === "home" && !selectedCategory && (
+        <HomePage
+          onSelectCategory={setSelectedCategory}
+        />
+      )}
+
+      {currentTab === "home" && selectedCategory && (
+        <CategoryDetailPage
+          category={selectedCategory}
+          onBack={() => setSelectedCategory(null)}
+          onSelectChant={setSelectedChant}
+        />
       )}
 
       {currentTab === "playlist" && !selectedPlaylist && (
@@ -159,8 +173,8 @@ function App() {
       <BottomNav
         currentTab={currentTab}
         onTabChange={(tab) => {
-          // Reset playlist drill-down when switching away
           if (tab !== "playlist") setSelectedPlaylist(null);
+          if (tab !== "home") setSelectedCategory(null);
           setCurrentTab(tab);
         }}
         playlistCount={playlists.length}
