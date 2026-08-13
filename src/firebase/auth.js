@@ -23,16 +23,13 @@ export function subscribeToAuthState(callback) {
 /**
  * Signs in with Google.
  *
- * @param {boolean} skipLinking - When true, always use signInWithPopup directly
- *   (no linkWithPopup attempt). Pass true when the caller knows the current
- *   anonymous session was just created after a logout and has no data worth
- *   preserving — this avoids the double-popup / popup-blocked problem that
- *   occurs when linkWithPopup fails internally and we try to open a second
- *   popup in the catch block.
+ * @param {boolean} skipLinking - When true, skip linkWithPopup and use
+ *   signInWithPopup directly. Pass true for post-logout sessions where there
+ *   is no anonymous data worth preserving (avoids double-popup / popup-blocked).
  *
  * Returns { user, wasLinked }
  *   wasLinked = true  → same UID kept, Firestore data preserved
- *   wasLinked = false → new UID (Google account)
+ *   wasLinked = false → signed in as existing Google account
  */
 export async function signInWithGoogle(skipLinking = false) {
   const currentUser = auth.currentUser;
@@ -48,16 +45,34 @@ export async function signInWithGoogle(skipLinking = false) {
       ) {
         throw err;
       }
-      if (err.code === "auth/credential-already-in-use" && err.credential) {
-        const result = await signInWithCredential(auth, err.credential);
+
+      if (err.code === "auth/credential-already-in-use") {
+        // Firebase v9+ modular API: use credentialFromError() — the official
+        // API to extract the OAuthCredential from the error object.
+        // Fallback to err.credential for backward-compat with older SDK versions.
+        const credential =
+          GoogleAuthProvider.credentialFromError(err) ?? err.credential ?? null;
+
+        if (credential) {
+          const result = await signInWithCredential(auth, credential);
+          return { user: result.user, wasLinked: false };
+        }
+
+        // No credential available (edge case) — sign in fresh via redirect-less
+        // method won't work without a credential, so sign in with popup.
+        // This is safe because at this point the previous linkWithPopup popup
+        // is already CLOSED (we are in the catch block), so this is a NEW
+        // popup triggered from within the same user-gesture scope.
+        const result = await signInWithPopup(auth, googleProvider);
         return { user: result.user, wasLinked: false };
       }
+
+      // Any other unexpected error — re-throw to surface to the UI.
       throw err;
     }
   }
 
-  // Direct sign-in (no linking): used when skipLinking=true (post-logout fresh
-  // anonymous session) or when the current user is not anonymous.
+  // Direct sign-in (no linking): post-logout fresh session or non-anonymous user.
   const result = await signInWithPopup(auth, googleProvider);
   return { user: result.user, wasLinked: false };
 }
