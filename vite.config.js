@@ -42,6 +42,11 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Exclude Firebase reserved paths (/__/) from the navigation fallback.
+        // Without this, the service worker intercepts the Firebase Auth popup
+        // URL (/__/auth/handler) and returns the cached index.html, causing
+        // the popup to display the app instead of the Google sign-in screen.
+        navigateFallbackDenylist: [/^\/__\//],
         // Cache Google Fonts so the app works offline
         runtimeCaching: [
           {
