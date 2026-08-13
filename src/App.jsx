@@ -58,6 +58,7 @@ function App() {
   if (selectedChant) {
     return (
       <ReadingPage
+        key={selectedChant.id}
         chant={selectedChant}
         onBack={handleBack}
         isInPlaylist={isInPlaylist}
