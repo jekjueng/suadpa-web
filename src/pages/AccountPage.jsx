@@ -92,9 +92,18 @@ function ToggleSwitch({ enabled, onChange, label, description }) {
 // ── Voice & Speed settings ───────────────────────────────────────────────────
 
 // Verified against Google Cloud TTS voices list (th-TH, Aug 2026).
+// All tiers have free quota ≥ 1M chars/month — comfortably covers ~100 chants/month.
 const TTS_VOICES = [
-  { value: "th-TH-Neural2-C",  label: "Neural2 หญิง (แนะนำ)", badge: "Neural2"  },
-  { value: "th-TH-Standard-A", label: "Standard หญิง",        badge: "Standard" },
+  { value: "th-TH-Neural2-C",           label: "Neural2 หญิง (แนะนำ)",        badge: "Neural2"  },
+  { value: "th-TH-Standard-A",          label: "Standard หญิง",               badge: "Standard" },
+  { value: "th-TH-Chirp3-HD-Aoede",     label: "Chirp3 HD · Aoede หญิง",      badge: "HD"       },
+  { value: "th-TH-Chirp3-HD-Kore",      label: "Chirp3 HD · Kore หญิง",       badge: "HD"       },
+  { value: "th-TH-Chirp3-HD-Leda",      label: "Chirp3 HD · Leda หญิง",       badge: "HD"       },
+  { value: "th-TH-Chirp3-HD-Zephyr",    label: "Chirp3 HD · Zephyr หญิง",     badge: "HD"       },
+  { value: "th-TH-Chirp3-HD-Charon",    label: "Chirp3 HD · Charon ชาย",      badge: "HD"       },
+  { value: "th-TH-Chirp3-HD-Puck",      label: "Chirp3 HD · Puck ชาย",        badge: "HD"       },
+  { value: "th-TH-Chirp3-HD-Fenrir",    label: "Chirp3 HD · Fenrir ชาย",      badge: "HD"       },
+  { value: "th-TH-Chirp3-HD-Enceladus", label: "Chirp3 HD · Enceladus ชาย",   badge: "HD"       },
 ];
 
 const SPEED_OPTIONS = [
