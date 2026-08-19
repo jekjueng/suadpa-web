@@ -108,11 +108,11 @@ export default function AdminDashboardPage() {
   useEffect(() => { load(); }, [load]);
 
   async function handleSeed() {
-    if (!window.confirm("⚠️ จะเพิ่มข้อมูลตั้งต้น 3 หมวดหมู่ และ 7 บทสวด ลงใน Firestore\nกดตกลงเพื่อยืนยัน")) return;
+    if (!window.confirm("⚠️ การดำเนินการนี้จะลบข้อมูลหมวดหมู่และบทสวดทั้งหมดที่มีอยู่ก่อน\nแล้วเพิ่มข้อมูลใหม่ 5 หมวดหมู่ และ 20 บทสวด\n\nกดตกลงเพื่อยืนยัน")) return;
     setSeeding(true);
     try {
       await seedInitialData();
-      setToast({ type: "success", message: "🌱 Seed ข้อมูลสำเร็จ! เพิ่ม 3 หมวดหมู่ และ 7 บทสวดเรียบร้อยแล้ว" });
+      setToast({ type: "success", message: "🌱 Seed ข้อมูลสำเร็จ! เพิ่ม 5 หมวดหมู่ และ 20 บทสวดเรียบร้อยแล้ว" });
       await load(); // refresh stats
     } catch (err) {
       setToast({ type: "error", message: `Seed ไม่สำเร็จ: ${err.message}` });
