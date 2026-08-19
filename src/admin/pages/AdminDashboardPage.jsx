@@ -108,12 +108,15 @@ export default function AdminDashboardPage() {
   useEffect(() => { load(); }, [load]);
 
   async function handleSeed() {
-    if (!window.confirm("⚠️ การดำเนินการนี้จะลบข้อมูลหมวดหมู่และบทสวดทั้งหมดที่มีอยู่ก่อน\nแล้วเพิ่มข้อมูลใหม่ 5 หมวดหมู่ และ 20 บทสวด\n\nกดตกลงเพื่อยืนยัน")) return;
+    if (!window.confirm("🌱 จะเพิ่มหมวดหมู่และบทสวดตั้งต้น (ถ้ามีชื่อซ้ำอยู่แล้วจะข้าม ไม่ลบข้อมูลเดิม)\n\nกดตกลงเพื่อยืนยัน")) return;
     setSeeding(true);
     try {
-      await seedInitialData();
-      setToast({ type: "success", message: "🌱 Seed ข้อมูลสำเร็จ! เพิ่ม 5 หมวดหมู่ และ 20 บทสวดเรียบร้อยแล้ว" });
-      await load(); // refresh stats
+      const result = await seedInitialData();
+      setToast({
+        type: "success",
+        message: `🌱 Seed สำเร็จ — เพิ่มใหม่ ${result.added} รายการ (หมวด ${result.addedCategories} / บทสวด ${result.addedChants}) · ข้ามซ้ำ ${result.skipped} รายการ`,
+      });
+      await load();
     } catch (err) {
       setToast({ type: "error", message: `Seed ไม่สำเร็จ: ${err.message}` });
     } finally {
