@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getDashboardStats, getTopChants, getCategories } from "../../firebase/adminDb";
+import { seedInitialData } from "../../firebase/seedData";
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,21 @@ function ViewCountBadge({ count }) {
   );
 }
 
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+function Toast({ type, message, onClose }) {
+  const styles = {
+    success: "bg-green-600 text-white",
+    error:   "bg-red-600 text-white",
+  };
+  return (
+    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-lg text-sm font-semibold max-w-sm w-full ${styles[type]}`}>
+      <span className="flex-1">{message}</span>
+      <button onClick={onClose} className="opacity-70 hover:opacity-100 text-lg leading-none">&times;</button>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function AdminDashboardPage() {
@@ -69,6 +85,8 @@ export default function AdminDashboardPage() {
   const [categories,  setCategories]  = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [refreshedAt, setRefreshedAt] = useState(null);
+  const [seeding,     setSeeding]     = useState(false);
+  const [toast,       setToast]       = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,6 +106,20 @@ export default function AdminDashboardPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  async function handleSeed() {
+    if (!window.confirm("⚠️ จะเพิ่มข้อมูลตั้งต้น 3 หมวดหมู่ และ 7 บทสวด ลงใน Firestore\nกดตกลงเพื่อยืนยัน")) return;
+    setSeeding(true);
+    try {
+      await seedInitialData();
+      setToast({ type: "success", message: "🌱 Seed ข้อมูลสำเร็จ! เพิ่ม 3 หมวดหมู่ และ 7 บทสวดเรียบร้อยแล้ว" });
+      await load(); // refresh stats
+    } catch (err) {
+      setToast({ type: "error", message: `Seed ไม่สำเร็จ: ${err.message}` });
+    } finally {
+      setSeeding(false);
+    }
+  }
 
   function categoryNames(ids = []) {
     return ids
@@ -125,6 +157,11 @@ export default function AdminDashboardPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto">
 
+      {/* Toast */}
+      {toast && (
+        <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -135,12 +172,32 @@ export default function AdminDashboardPage() {
               : "กำลังโหลดข้อมูล..."}
           </p>
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-blue-700 disabled:opacity-40 transition-colors"
-          title="รีเฟรชข้อมูล"
-        >
+        <div className="flex items-center gap-3">
+          {/* Seed button — ชั่วคราว สำหรับเพิ่มข้อมูลตั้งต้น */}
+          <button
+            onClick={handleSeed}
+            disabled={seeding}
+            className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-800 border border-emerald-200 hover:border-emerald-400 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg disabled:opacity-40 transition-colors"
+            title="เพิ่มข้อมูลหมวดหมู่และบทสวดตั้งต้น"
+          >
+            {seeding ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                className="animate-spin">
+                <polyline points="23 4 23 10 17 10"/>
+                <polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            ) : "🌱"}
+            {seeding ? "กำลัง Seed..." : "Seed Initial Data"}
+          </button>
+
+          <button
+            onClick={load}
+            disabled={loading}
+            className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-blue-700 disabled:opacity-40 transition-colors"
+            title="รีเฟรชข้อมูล"
+          >
           <svg
             xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
             fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
@@ -151,7 +208,8 @@ export default function AdminDashboardPage() {
             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
           </svg>
           รีเฟรช
-        </button>
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}
